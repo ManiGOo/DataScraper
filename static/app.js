@@ -2,7 +2,6 @@ let currentTaskId = null;
 let pollInterval = null;
 let conversationHistory = [];
 let authToken = localStorage.getItem('datascraper_token') || null;
-let currentAuthMode = 'login'; // 'login' or 'signup'
 
 document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();
@@ -11,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Auth Functions
 function checkAuthStatus() {
     if (!authToken) {
-        renderLoggedOutUI();
+        window.location.href = '/login';
         return;
     }
 
@@ -31,91 +30,24 @@ function checkAuthStatus() {
 }
 
 function renderLoggedInUI(email) {
-    document.getElementById('loggedOutNav').classList.add('hidden');
     document.getElementById('loggedInNav').classList.remove('hidden');
     document.getElementById('userEmailBadge').innerText = email;
-}
-
-function renderLoggedOutUI() {
-    document.getElementById('loggedOutNav').classList.remove('hidden');
-    document.getElementById('loggedInNav').classList.add('hidden');
-}
-
-function openAuthModal(mode = 'login') {
-    currentAuthMode = mode;
-    switchAuthTab(mode);
-    document.getElementById('authModal').classList.remove('hidden');
-}
-
-function switchAuthTab(mode) {
-    currentAuthMode = mode;
-    const tabLogin = document.getElementById('tabLogin');
-    const tabSignup = document.getElementById('tabSignup');
-    const modalTitle = document.getElementById('authModalTitle');
-
-    if (mode === 'login') {
-        tabLogin.classList.add('active');
-        tabSignup.classList.remove('active');
-        modalTitle.innerText = 'Account Login';
-    } else {
-        tabSignup.classList.add('active');
-        tabLogin.classList.remove('active');
-        modalTitle.innerText = 'Create New Account';
-    }
 }
 
 function closeModal(modalId) {
     document.getElementById(modalId).classList.add('hidden');
 }
 
-async function handleAuthSubmit(e) {
-    e.preventDefault();
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
-    const btnSubmit = document.getElementById('btnAuthSubmit');
-
-    const endpoint = currentAuthMode === 'signup' ? '/api/auth/register' : '/api/auth/login';
-
-    btnSubmit.disabled = true;
-    btnSubmit.innerHTML = `<span>Processing...</span>`;
-
-    try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.detail || 'Authentication failed');
-        }
-
-        authToken = data.token;
-        localStorage.setItem('datascraper_token', authToken);
-        renderLoggedInUI(data.email);
-        closeModal('authModal');
-        alert(`Welcome ${data.email}! You are now logged in.`);
-
-    } catch (err) {
-        alert("Authentication Error: " + err.message);
-    } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = `<span>Submit</span>`;
-    }
-}
-
 function logoutUser() {
     authToken = null;
     localStorage.removeItem('datascraper_token');
-    renderLoggedOutUI();
+    window.location.href = '/login';
 }
 
 // User History Modal (Last 20 Queries)
 async function openHistoryModal() {
     if (!authToken) {
-        openAuthModal('login');
+        window.location.href = '/login';
         return;
     }
 
@@ -161,7 +93,7 @@ function useHistoryQuery(queryText) {
 // Saved DB Data Modal
 async function openSavedDataModal() {
     if (!authToken) {
-        openAuthModal('login');
+        window.location.href = '/login';
         return;
     }
 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - GitHub Data Scraper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .auth-page-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+        .auth-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(16px);
+        }
+        .auth-title {
+            text-align: center;
+            font-family: var(--font-heading);
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .auth-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        .auth-link {
+            display: block;
+            text-align: center;
+            margin-top: 1.5rem;
+            color: var(--accent-cyan);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .auth-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-container auth-page-container">
+        <div class="auth-card">
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-subtitle">Sign up to use the GitHub Data Scraper</p>
+            
+            <form id="signupForm" onsubmit="handleSignupSubmit(event)">
+                <div class="form-group">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" required placeholder="user@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" required placeholder="••••••••" minlength="6">
+                </div>
+
+                <button type="submit" id="btnSignupSubmit" class="btn-primary" style="margin-top: 1.5rem;">
+                    <span>Sign Up</span>
+                </button>
+            </form>
+
+            <a href="/login" class="auth-link">Already have an account? Login here</a>
+        </div>
+    </div>
+
+    <script>
+        // If already logged in, redirect to home
+        if (localStorage.getItem('datascraper_token')) {
+            window.location.href = '/';
+        }
+
+        async function handleSignupSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const btnSubmit = document.getElementById('btnSignupSubmit');
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = `<span>Creating Account...</span>`;
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Registration failed');
+                }
+
+                localStorage.setItem('datascraper_token', data.token);
+                alert(`Welcome ${data.email}! Your account is created.`);
+                window.location.href = '/';
+
+            } catch (err) {
+                alert("Sign Up Error: " + err.message);
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<span>Sign Up</span>`;
+            }
+        }
+    </script>
+</body>
+</html>

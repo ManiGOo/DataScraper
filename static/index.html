@@ -34,13 +34,7 @@
 
             <!-- User Auth Nav Container -->
             <div class="user-nav">
-                <!-- Logged Out Actions -->
-                <div id="loggedOutNav" class="auth-buttons">
-                    <button class="btn-secondary" onclick="openAuthModal('login')">🔑 Login</button>
-                    <button class="btn-primary-sm" onclick="openAuthModal('signup')">✨ Sign Up</button>
-                </div>
-
-                <!-- Logged In User Pill -->
+                <!-- Logged In User Pill (Only view since index is protected) -->
                 <div id="loggedInNav" class="user-profile-bar hidden">
                     <button class="btn-nav-action" onclick="openHistoryModal()">📜 History (Last 20)</button>
                     <button class="btn-nav-action" onclick="openSavedDataModal()">💾 Saved DB Data</button>
@@ -210,36 +204,7 @@
         </main>
     </div>
 
-    <!-- Auth Modal -->
-    <div id="authModal" class="modal-backdrop hidden">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3 id="authModalTitle">Account Login</h3>
-                <button class="modal-close" onclick="closeModal('authModal')">×</button>
-            </div>
-            
-            <div class="auth-tabs">
-                <button id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">Login</button>
-                <button id="tabSignup" class="tab-btn" onclick="switchAuthTab('signup')">Sign Up</button>
-            </div>
 
-            <form id="authForm" onsubmit="handleAuthSubmit(event)">
-                <div class="form-group">
-                    <label for="authEmail">Email Address</label>
-                    <input type="email" id="authEmail" required placeholder="user@example.com">
-                </div>
-
-                <div class="form-group">
-                    <label for="authPassword">Password</label>
-                    <input type="password" id="authPassword" required placeholder="••••••••">
-                </div>
-
-                <button type="submit" id="btnAuthSubmit" class="btn-primary" style="margin-top: 1rem;">
-                    <span>Submit</span>
-                </button>
-            </form>
-        </div>
-    </div>
 
     <!-- History Modal (Last 20 Queries) -->
     <div id="historyModal" class="modal-backdrop hidden">

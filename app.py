@@ -206,6 +206,22 @@ def read_root():
             return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>GitHub Data Scraper API is running.</h1>")
 
+@app.get("/login", response_class=HTMLResponse)
+def read_login():
+    login_file = os.path.join(STATIC_DIR, "login.html")
+    if os.path.exists(login_file):
+        with open(login_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Login Page</h1>")
+
+@app.get("/signup", response_class=HTMLResponse)
+def read_signup():
+    signup_file = os.path.join(STATIC_DIR, "signup.html")
+    if os.path.exists(signup_file):
+        with open(signup_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Signup Page</h1>")
+
 # Authentication Endpoints
 @app.post("/api/auth/register")
 def register_user(req: RegisterRequest, db: Session = Depends(get_db)):
