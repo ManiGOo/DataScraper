@@ -56,7 +56,7 @@ async function startScraping() {
         return;
     }
 
-    // Reset UI State
+    // Reset UI State for new scraping run
     const btnScrape = document.getElementById('btnScrape');
     const statusText = document.getElementById('statusText');
     const statusDot = document.querySelector('.status-dot');
@@ -65,15 +65,25 @@ async function startScraping() {
     const terminalLog = document.getElementById('terminalLog');
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
+    const spinner = document.getElementById('spinner');
+    const checkIcon = document.getElementById('checkIcon');
+    const progressTitle = document.getElementById('progressTitle');
 
     btnScrape.disabled = true;
     btnScrape.style.opacity = '0.6';
     statusText.innerText = "Scraping In Progress";
     statusDot.classList.add('active');
 
+    // Show loading spinner, hide check icon
+    spinner.classList.remove('hidden');
+    checkIcon.classList.add('hidden');
+    progressTitle.innerText = "Scraping Execution Progress";
+
     progressSection.classList.remove('hidden');
     resultsSection.classList.add('hidden');
 
+    progressBar.classList.remove('completed');
+    progressPercent.classList.remove('completed');
     progressBar.style.width = '0%';
     progressPercent.innerText = '0%';
     terminalLog.innerHTML = `<div class="log-line text-muted">[System] Initiating scrape task for query: "${query}"...</div>`;
@@ -147,11 +157,29 @@ function finishScraping(data) {
     const tableBody = document.getElementById('tableBody');
     const summaryStats = document.getElementById('summaryStats');
 
+    const spinner = document.getElementById('spinner');
+    const checkIcon = document.getElementById('checkIcon');
+    const progressTitle = document.getElementById('progressTitle');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+
+    // 1. STOP THE LOADER & SHOW COMPLETION STATE
+    spinner.classList.add('hidden');
+    checkIcon.classList.remove('hidden');
+    progressTitle.innerText = "Scraping Task Completed";
+    
+    progressBar.style.width = '100%';
+    progressPercent.innerText = '✓ 100%';
+    progressBar.classList.add('completed');
+    progressPercent.classList.add('completed');
+
+    // 2. RESTORE SCRAPE BUTTON & STATUS BADGE
     btnScrape.disabled = false;
     btnScrape.style.opacity = '1';
-    statusText.innerText = "Scrape Completed";
+    statusText.innerText = "Task Completed";
     statusDot.classList.remove('active');
 
+    // 3. DISPLAY RESULTS SECTION
     resultsSection.classList.remove('hidden');
 
     const results = data.results || [];
@@ -161,7 +189,7 @@ function finishScraping(data) {
     summaryStats.innerText = `Gathered ${results.length} profile(s) | Emails: ${emailsCount} | LinkedIn: ${linkedinCount}`;
 
     if (results.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No profile results found for query.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No profile results found for query. Try modifying your search parameters or preset tags.</td></tr>`;
         return;
     }
 
@@ -195,11 +223,15 @@ function resetUI() {
     const btnScrape = document.getElementById('btnScrape');
     const statusText = document.getElementById('statusText');
     const statusDot = document.querySelector('.status-dot');
+    const spinner = document.getElementById('spinner');
+    const checkIcon = document.getElementById('checkIcon');
 
     btnScrape.disabled = false;
     btnScrape.style.opacity = '1';
     statusText.innerText = "System Ready";
     statusDot.classList.remove('active');
+    spinner.classList.add('hidden');
+    checkIcon.classList.add('hidden');
 }
 
 function downloadFile(fileFormat) {

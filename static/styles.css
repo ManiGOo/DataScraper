@@ -387,11 +387,31 @@ input[type="text"]:focus, select:focus {
     to { transform: rotate(360deg); }
 }
 
+.check-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid var(--accent-emerald);
+    color: var(--accent-emerald);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
 .percent-badge {
     font-family: var(--font-mono);
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--accent-cyan);
+}
+
+.percent-badge.completed {
+    color: var(--accent-emerald);
+    text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
 }
 
 .progress-bar-container {
@@ -407,7 +427,11 @@ input[type="text"]:focus, select:focus {
     height: 100%;
     background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan));
     border-radius: 10px;
-    transition: width 0.4s ease;
+    transition: width 0.4s ease, background 0.4s ease;
+}
+
+.progress-bar.completed {
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
 }
 
 .terminal-container {
