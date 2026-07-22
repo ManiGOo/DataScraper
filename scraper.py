@@ -1,7 +1,11 @@
 import re
+import os
 import urllib.parse
 from typing import List, Dict, Optional, Callable
 from playwright.sync_api import sync_playwright, Page, BrowserContext
+
+# Force Playwright to look for browsers locally
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 
 EMAIL_REGEX = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
 
