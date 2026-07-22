@@ -43,22 +43,43 @@
                 <div class="card-header">
                     <div class="flex-align">
                         <span class="ai-sparkle-icon">✨</span>
-                        <h2>AI Search Helper</h2>
+                        <h2>AI Search Agent</h2>
                     </div>
-                    <span class="badge badge-ai">Groq gpt-oss-20b</span>
+                    <div class="flex-align">
+                        <button type="button" id="btnClearMemory" onclick="clearAiMemory()" class="btn-memory hidden" title="Clear Chat History">
+                            <span>🧹 Clear Memory</span>
+                        </button>
+                        <span class="badge badge-ai">Groq gpt-oss-20b</span>
+                    </div>
                 </div>
-                <p class="ai-desc">Describe what developers you want to find in plain English, and AI will build the GitHub search query for you.</p>
+                <p class="ai-desc">Describe target developers in plain English. The AI agent will analyze your request, explain its reasoning, and generate 3 query strategies.</p>
 
                 <div class="ai-input-row">
                     <input 
                         type="text" 
                         id="aiPromptInput" 
-                        placeholder="e.g. Find Python developers in India who are students with more than 10 repos" 
+                        placeholder="e.g. Find Python developers in India who are students with > 10 repos" 
                         onkeydown="if(event.key === 'Enter') generateAiQuery();"
                     />
                     <button type="button" id="btnAiGenerate" onclick="generateAiQuery()" class="btn-ai">
-                        <span>Generate Query</span>
+                        <span>Generate Strategies ✨</span>
                     </button>
+                </div>
+
+                <!-- AI Output Reasoning & Query Options Box -->
+                <div id="aiResponseContainer" class="ai-response-box hidden">
+                    <div class="ai-reasoning-card">
+                        <div class="reasoning-header">
+                            <span class="bot-icon">🤖</span>
+                            <strong>AI Agent Reasoning & Syntax Analysis:</strong>
+                        </div>
+                        <p id="aiReasoningText" class="reasoning-text"></p>
+                    </div>
+
+                    <div class="queries-title">Generated Search Strategies:</div>
+                    <div id="aiQueriesList" class="queries-grid">
+                        <!-- Dynamic Query Cards -->
+                    </div>
                 </div>
             </section>
 

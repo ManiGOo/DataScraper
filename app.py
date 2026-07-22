@@ -1,7 +1,8 @@
 import os
+import json
 import uuid
 import threading
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, BackgroundTasks, HTTPException
@@ -15,7 +16,7 @@ from scraper import GitHubScraper
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="GitHub Data Scraper API with Groq AI Helper")
+app = FastAPI(title="GitHub Data Scraper API with Groq AI Agent")
 
 # Ensure outputs directory exists
 OUTPUTS_DIR = os.path.join(os.path.dirname(__file__), "outputs")
@@ -33,8 +34,13 @@ class ScrapeRequest(BaseModel):
     query: str
     max_results: int = 10
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class AiQueryRequest(BaseModel):
     prompt: str
+    history: Optional[List[ChatMessage]] = []
 
 def get_groq_client() -> Groq:
     api_key = os.getenv("GROQ_API_KEY")
@@ -98,51 +104,84 @@ def generate_ai_query(req: AiQueryRequest):
     model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
     system_prompt = (
-        "You are an expert AI assistant that constructs precise, valid GitHub User Search query strings. "
-        "Translate the user's plain English request into optimal GitHub search parameters.\n\n"
-        "Supported GitHub user search filters include:\n"
-        "- location:<city/country>\n"
-        "- language:<programming_language>\n"
-        "- repos:><count> or repos:<count>\n"
-        "- followers:><count>\n"
-        "- type:user\n"
-        "- keywords (e.g. student, developer, fullstack, AI, founder)\n\n"
-        "ALWAYS include `type:user` in the query unless specified otherwise.\n"
-        "Output ONLY the raw GitHub search string without markdown code blocks, quotes, or conversational preamble."
+        "You are an expert AI Assistant and GitHub Search Syntax Architect. Your goal is to analyze the user's request, "
+        "explain your technical reasoning, and generate exactly 3 distinct, valid GitHub user search query options.\n\n"
+        "STRICT GITHUB SYNTAX RULES (NO HALLUCINATIONS):\n"
+        "1. Always include `type:user` in every query string.\n"
+        "2. Location parameter must be formatted as `location:<city_or_country>` (e.g. location:India, location:London, location:\"San Francisco\"). NEVER omit the colon.\n"
+        "3. Language parameter must be formatted as `language:<programming_language>` (e.g. language:Python, language:TypeScript). NEVER omit the colon.\n"
+        "4. Repositories parameter must be `repos:><number>` (e.g. repos:>10). NEVER omit the colon.\n"
+        "5. Keyword qualifiers: Place keywords like `student`, `fullstack`, `developer` directly or with `in:bio` (e.g., `student location:India language:Python repos:>10 type:user`).\n"
+        "6. If the user asks to modify or refine a previous query from history, adjust the parameters accordingly while preserving intact constraints.\n\n"
+        "REQUIRED OUTPUT FORMAT:\n"
+        "Return STRICT JSON ONLY matching this exact structure (no markdown formatting outside JSON):\n"
+        "{\n"
+        '  "reasoning": "Detailed technical explanation of how you parsed user intent and constructed the query options.",\n'
+        '  "queries": [\n'
+        '    {\n'
+        '      "title": "Strict Query (Exact Match)",\n'
+        '      "description": "Combines all exact parameters specified in the request.",\n'
+        '      "query": "student location:India language:Python repos:>10 type:user"\n'
+        '    },\n'
+        '    {\n'
+        '      "title": "Broad Query (High Velocity)",\n'
+        '      "description": "Widens search range for broader candidate discovery.",\n'
+        '      "query": "location:India language:Python repos:>10 type:user"\n'
+        '    },\n'
+        '    {\n'
+        '      "title": "Bio-Targeted Query (Keyword Focused)",\n'
+        '      "description": "Searches bio text for specific student/role keywords.",\n'
+        '      "query": "student in:bio location:India language:Python type:user"\n'
+        '    }\n'
+        '  ]\n'
+        "}"
     )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Append conversation history for memory
+    if req.history:
+        for msg in req.history[-6:]:
+            messages.append({"role": msg.role, "content": msg.content})
+            
+    messages.append({"role": "user", "content": req.prompt})
 
     try:
         completion = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": req.prompt}
-            ],
+            messages=messages,
             temperature=0.2,
-            max_tokens=150,
+            max_tokens=600,
+            response_format={"type": "json_object"}
         )
-        generated_query = completion.choices[0].message.content.strip()
-        # Clean up any potential code block formatting
-        generated_query = generated_query.replace('```', '').replace('`', '').strip()
-        return {"query": generated_query, "model_used": model}
+        content_str = completion.choices[0].message.content.strip()
+        data = json.loads(content_str)
+        return {
+            "reasoning": data.get("reasoning", "Parsed request successfully."),
+            "queries": data.get("queries", []),
+            "model_used": model
+        }
 
     except Exception as e:
-        # Fallback to llama-3.3-70b-versatile if specified model encounters an issue
+        # Fallback to llama-3.3-70b-versatile if gpt-oss model json mode differs
         try:
             fallback_model = "llama-3.3-70b-versatile"
             completion = client.chat.completions.create(
                 model=fallback_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": req.prompt}
-                ],
+                messages=messages,
                 temperature=0.2,
-                max_tokens=150,
+                max_tokens=600,
+                response_format={"type": "json_object"}
             )
-            generated_query = completion.choices[0].message.content.strip().replace('```', '').replace('`', '').strip()
-            return {"query": generated_query, "model_used": fallback_model}
+            content_str = completion.choices[0].message.content.strip()
+            data = json.loads(content_str)
+            return {
+                "reasoning": data.get("reasoning", "Parsed request successfully."),
+                "queries": data.get("queries", []),
+                "model_used": fallback_model
+            }
         except Exception as fallback_err:
-            raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"AI Agent Error: {str(e)}")
 
 @app.post("/api/scrape")
 def start_scrape(req: ScrapeRequest):

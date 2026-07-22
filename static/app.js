@@ -1,12 +1,27 @@
 let currentTaskId = null;
 let pollInterval = null;
+let conversationHistory = [];
 
 function setQuery(queryText) {
     const queryInput = document.getElementById('queryInput');
     queryInput.value = queryText;
     queryInput.focus();
     queryInput.style.borderColor = 'var(--accent-cyan)';
-    setTimeout(() => { queryInput.style.borderColor = ''; }, 1200);
+    queryInput.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.4)';
+    setTimeout(() => { 
+        queryInput.style.borderColor = ''; 
+        queryInput.style.boxShadow = ''; 
+    }, 1500);
+
+    // Smooth scroll to search form
+    document.querySelector('.search-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearAiMemory() {
+    conversationHistory = [];
+    document.getElementById('aiResponseContainer').classList.add('hidden');
+    document.getElementById('btnClearMemory').classList.add('hidden');
+    document.getElementById('aiPromptInput').value = '';
 }
 
 async function generateAiQuery() {
@@ -21,30 +36,84 @@ async function generateAiQuery() {
 
     const origText = btnAiGenerate.innerHTML;
     btnAiGenerate.disabled = true;
-    btnAiGenerate.innerHTML = `<span>Generating...</span>`;
+    btnAiGenerate.innerHTML = `<span>Analyzing Request...</span>`;
 
     try {
         const response = await fetch('/api/generate-query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
+            body: JSON.stringify({ 
+                prompt: prompt,
+                history: conversationHistory 
+            })
         });
 
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.detail || "Failed to generate AI query.");
+            throw new Error(err.detail || "Failed to generate AI query strategies.");
         }
 
         const data = await response.json();
-        if (data.query) {
-            setQuery(data.query);
-        }
+        
+        // Render Reasoning & Generated Queries
+        renderAiResults(data);
+
+        // Save into conversational memory
+        conversationHistory.push({ role: "user", content: prompt });
+        conversationHistory.push({ 
+            role: "assistant", 
+            content: `Reasoning: ${data.reasoning}\nQueries Generated: ${JSON.stringify(data.queries)}` 
+        });
+
+        document.getElementById('btnClearMemory').classList.remove('hidden');
+
     } catch (err) {
-        alert("AI Assistant Error: " + err.message);
+        alert("AI Search Agent Error: " + err.message);
     } finally {
         btnAiGenerate.disabled = false;
         btnAiGenerate.innerHTML = origText;
     }
+}
+
+function renderAiResults(data) {
+    const container = document.getElementById('aiResponseContainer');
+    const reasoningText = document.getElementById('aiReasoningText');
+    const queriesList = document.getElementById('aiQueriesList');
+
+    reasoningText.innerText = data.reasoning || "Analyzed user intent and formulated query parameters.";
+
+    const queries = data.queries || [];
+    if (queries.length === 0) {
+        queriesList.innerHTML = `<div class="text-muted">No query strategies returned.</div>`;
+    } else {
+        queriesList.innerHTML = queries.map((q, idx) => {
+            const title = q.title || `Strategy #${idx + 1}`;
+            const desc = q.description || 'Optimized GitHub query option.';
+            const queryStr = q.query || '';
+
+            return `
+                <div class="query-option-card">
+                    <div>
+                        <div class="query-card-header">
+                            <h4>${title}</h4>
+                        </div>
+                        <p class="query-desc">${desc}</p>
+                        <div class="query-code-preview">${queryStr}</div>
+                    </div>
+                    <button type="button" class="btn-use-query" onclick="setQuery('${escapeQuotes(queryStr)}')">
+                        <span>🚀 Use This Query</span>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    container.classList.remove('hidden');
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function escapeQuotes(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
 async function startScraping() {
@@ -74,7 +143,6 @@ async function startScraping() {
     statusText.innerText = "Scraping In Progress";
     statusDot.classList.add('active');
 
-    // Show loading spinner, hide check icon
     spinner.classList.remove('hidden');
     checkIcon.classList.add('hidden');
     progressTitle.innerText = "Scraping Execution Progress";
@@ -173,7 +241,7 @@ function finishScraping(data) {
     progressBar.classList.add('completed');
     progressPercent.classList.add('completed');
 
-    // 2. RESTORE SCRAPE BUTTON & STATUS BADGE
+    // 2. RESTORE BUTTON & STATUS BADGE
     btnScrape.disabled = false;
     btnScrape.style.opacity = '1';
     statusText.innerText = "Task Completed";
