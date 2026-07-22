@@ -7,5 +7,9 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: GROQ_MODEL
         value: "openai/gpt-oss-20b"
