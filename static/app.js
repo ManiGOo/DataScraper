@@ -168,8 +168,6 @@ async function startScraping() {
     }
 
     const btnScrape = document.getElementById('btnScrape');
-    const statusText = document.getElementById('statusText');
-    const statusDot = document.querySelector('.status-dot');
     const progressSection = document.getElementById('progressSection');
     const resultsSection = document.getElementById('resultsSection');
     const terminalLog = document.getElementById('terminalLog');
@@ -181,8 +179,6 @@ async function startScraping() {
 
     btnScrape.disabled = true;
     btnScrape.style.opacity = '0.6';
-    statusText.innerText = "Scraping In Progress";
-    statusDot.classList.add('active');
 
     spinner.classList.remove('hidden');
     checkIcon.classList.add('hidden');
@@ -223,8 +219,6 @@ async function startScraping() {
         alert("Error starting scraper: " + err.message);
         btnScrape.disabled = false;
         btnScrape.style.opacity = '1';
-        statusText.innerText = "System Ready";
-        statusDot.classList.remove('active');
         progressSection.classList.add('hidden');
     }
 }
@@ -265,8 +259,6 @@ async function checkStatus() {
 
 function finishScraping(data) {
     const btnScrape = document.getElementById('btnScrape');
-    const statusText = document.getElementById('statusText');
-    const statusDot = document.querySelector('.status-dot');
     const resultsSection = document.getElementById('resultsSection');
     const tableBody = document.getElementById('tableBody');
     const summaryStats = document.getElementById('summaryStats');
@@ -288,8 +280,6 @@ function finishScraping(data) {
 
     btnScrape.disabled = false;
     btnScrape.style.opacity = '1';
-    statusText.innerText = "Task Completed";
-    statusDot.classList.remove('active');
 
     resultsSection.classList.remove('hidden');
 
@@ -332,15 +322,11 @@ function finishScraping(data) {
 
 function resetUI() {
     const btnScrape = document.getElementById('btnScrape');
-    const statusText = document.getElementById('statusText');
-    const statusDot = document.querySelector('.status-dot');
     const spinner = document.getElementById('spinner');
     const checkIcon = document.getElementById('checkIcon');
 
     btnScrape.disabled = false;
     btnScrape.style.opacity = '1';
-    statusText.innerText = "System Ready";
-    statusDot.classList.remove('active');
     spinner.classList.add('hidden');
     checkIcon.classList.add('hidden');
 }
