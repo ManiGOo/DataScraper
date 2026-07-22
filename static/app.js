@@ -1,7 +1,220 @@
 let currentTaskId = null;
 let pollInterval = null;
 let conversationHistory = [];
+let authToken = localStorage.getItem('datascraper_token') || null;
+let currentAuthMode = 'login'; // 'login' or 'signup'
 
+document.addEventListener('DOMContentLoaded', () => {
+    checkAuthStatus();
+});
+
+// Auth Functions
+function checkAuthStatus() {
+    if (!authToken) {
+        renderLoggedOutUI();
+        return;
+    }
+
+    fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Token expired');
+        return res.json();
+    })
+    .then(user => {
+        renderLoggedInUI(user.email);
+    })
+    .catch(() => {
+        logoutUser();
+    });
+}
+
+function renderLoggedInUI(email) {
+    document.getElementById('loggedOutNav').classList.add('hidden');
+    document.getElementById('loggedInNav').classList.remove('hidden');
+    document.getElementById('userEmailBadge').innerText = email;
+}
+
+function renderLoggedOutUI() {
+    document.getElementById('loggedOutNav').classList.remove('hidden');
+    document.getElementById('loggedInNav').classList.add('hidden');
+}
+
+function openAuthModal(mode = 'login') {
+    currentAuthMode = mode;
+    switchAuthTab(mode);
+    document.getElementById('authModal').classList.remove('hidden');
+}
+
+function switchAuthTab(mode) {
+    currentAuthMode = mode;
+    const tabLogin = document.getElementById('tabLogin');
+    const tabSignup = document.getElementById('tabSignup');
+    const modalTitle = document.getElementById('authModalTitle');
+
+    if (mode === 'login') {
+        tabLogin.classList.add('active');
+        tabSignup.classList.remove('active');
+        modalTitle.innerText = 'Account Login';
+    } else {
+        tabSignup.classList.add('active');
+        tabLogin.classList.remove('active');
+        modalTitle.innerText = 'Create New Account';
+    }
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const btnSubmit = document.getElementById('btnAuthSubmit');
+
+    const endpoint = currentAuthMode === 'signup' ? '/api/auth/register' : '/api/auth/login';
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `<span>Processing...</span>`;
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || 'Authentication failed');
+        }
+
+        authToken = data.token;
+        localStorage.setItem('datascraper_token', authToken);
+        renderLoggedInUI(data.email);
+        closeModal('authModal');
+        alert(`Welcome ${data.email}! You are now logged in.`);
+
+    } catch (err) {
+        alert("Authentication Error: " + err.message);
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<span>Submit</span>`;
+    }
+}
+
+function logoutUser() {
+    authToken = null;
+    localStorage.removeItem('datascraper_token');
+    renderLoggedOutUI();
+}
+
+// User History Modal (Last 20 Queries)
+async function openHistoryModal() {
+    if (!authToken) {
+        openAuthModal('login');
+        return;
+    }
+
+    const container = document.getElementById('historyListContainer');
+    container.innerHTML = `<div class="text-muted">Loading your query history...</div>`;
+    document.getElementById('historyModal').classList.remove('hidden');
+
+    try {
+        const response = await fetch('/api/user/history', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) throw new Error('Failed to load history');
+        const historyData = await response.json();
+
+        if (historyData.length === 0) {
+            container.innerHTML = `<div class="text-muted">No search queries recorded yet.</div>`;
+            return;
+        }
+
+        container.innerHTML = historyData.map(item => `
+            <div class="history-item">
+                <div>
+                    <div class="history-query-text">${escapeQuotes(item.query)}</div>
+                    <div class="history-meta">Date: ${item.created_at} | Max Profiles: ${item.max_results}</div>
+                </div>
+                <button type="button" class="btn-use-query" onclick="useHistoryQuery('${escapeQuotes(item.query)}')">
+                    <span>🚀 Re-run Query</span>
+                </button>
+            </div>
+        `).join('');
+
+    } catch (err) {
+        container.innerHTML = `<div style="color: #EF4444;">Error loading history: ${err.message}</div>`;
+    }
+}
+
+function useHistoryQuery(queryText) {
+    setQuery(queryText);
+    closeModal('historyModal');
+}
+
+// Saved DB Data Modal
+async function openSavedDataModal() {
+    if (!authToken) {
+        openAuthModal('login');
+        return;
+    }
+
+    const tableBody = document.getElementById('savedDataTableBody');
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading stored database records...</td></tr>`;
+    document.getElementById('savedDataModal').classList.remove('hidden');
+
+    try {
+        const response = await fetch('/api/user/saved-results', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) throw new Error('Failed to load saved database results');
+        const savedData = await response.json();
+
+        if (savedData.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No saved candidate profile records in database.</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = savedData.map((row, idx) => {
+            const name = row.name || 'N/A';
+            const emailHtml = (row.email && row.email !== 'N/A') 
+                ? `<span class="badge-email">${row.email}</span>` 
+                : `<span class="badge-na">N/A</span>`;
+
+            const linkedinHtml = (row.linkedin_url && row.linkedin_url !== 'N/A') 
+                ? `<a href="${row.linkedin_url}" target="_blank" class="badge-linkedin">View Profile ↗</a>` 
+                : `<span class="badge-na">N/A</span>`;
+
+            const githubHtml = `<a href="${row.github_url}" target="_blank" class="link-github">${row.github_url}</a>`;
+            const repos = row.repositories || '0';
+            const queryDate = `${row.query}<br><small style="color: var(--text-secondary);">${row.created_at}</small>`;
+
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${name}</strong></td>
+                    <td>${emailHtml}</td>
+                    <td>${linkedinHtml}</td>
+                    <td>${githubHtml}</td>
+                    <td>${repos}</td>
+                    <td>${queryDate}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        tableBody.innerHTML = `<tr><td colspan="7" style="color: #EF4444;">Error: ${err.message}</td></tr>`;
+    }
+}
+
+// AI Helper Functions
 function setQuery(queryText) {
     const queryInput = document.getElementById('queryInput');
     queryInput.value = queryText;
@@ -13,7 +226,6 @@ function setQuery(queryText) {
         queryInput.style.boxShadow = ''; 
     }, 1500);
 
-    // Smooth scroll to search form
     document.querySelector('.search-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -54,11 +266,8 @@ async function generateAiQuery() {
         }
 
         const data = await response.json();
-        
-        // Render Reasoning & Generated Queries
         renderAiResults(data);
 
-        // Save into conversational memory
         conversationHistory.push({ role: "user", content: prompt });
         conversationHistory.push({ 
             role: "assistant", 
@@ -113,6 +322,7 @@ function renderAiResults(data) {
 }
 
 function escapeQuotes(str) {
+    if (!str) return '';
     return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
@@ -125,7 +335,6 @@ async function startScraping() {
         return;
     }
 
-    // Reset UI State for new scraping run
     const btnScrape = document.getElementById('btnScrape');
     const statusText = document.getElementById('statusText');
     const statusDot = document.querySelector('.status-dot');
@@ -156,10 +365,15 @@ async function startScraping() {
     progressPercent.innerText = '0%';
     terminalLog.innerHTML = `<div class="log-line text-muted">[System] Initiating scrape task for query: "${query}"...</div>`;
 
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     try {
         const response = await fetch('/api/scrape', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify({ query: query, max_results: maxResults })
         });
 
@@ -231,7 +445,6 @@ function finishScraping(data) {
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
 
-    // 1. STOP THE LOADER & SHOW COMPLETION STATE
     spinner.classList.add('hidden');
     checkIcon.classList.remove('hidden');
     progressTitle.innerText = "Scraping Task Completed";
@@ -241,13 +454,11 @@ function finishScraping(data) {
     progressBar.classList.add('completed');
     progressPercent.classList.add('completed');
 
-    // 2. RESTORE BUTTON & STATUS BADGE
     btnScrape.disabled = false;
     btnScrape.style.opacity = '1';
     statusText.innerText = "Task Completed";
     statusDot.classList.remove('active');
 
-    // 3. DISPLAY RESULTS SECTION
     resultsSection.classList.remove('hidden');
 
     const results = data.results || [];
