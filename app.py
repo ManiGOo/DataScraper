@@ -18,7 +18,7 @@ from groq import Groq
 from sqlalchemy.orm import Session
 
 from scraper import GitHubScraper
-from database import init_db, get_db, SessionLocal, User, UserQuery, ScrapedResult
+from database import init_db, get_db, SessionLocal, User, UserQuery, ScrapedResult, ScrapeJob
 
 # Load environment variables
 load_dotenv()
@@ -26,7 +26,66 @@ load_dotenv()
 # Initialize Database tables
 init_db()
 
-app = FastAPI(title="GitHub Data Scraper API with Auth & Database")
+from contextlib import asynccontextmanager
+from api_scraper import GitHubAPIScraper
+import asyncio
+
+async def background_job_worker():
+    while True:
+        try:
+            with SessionLocal() as db:
+                job = db.query(ScrapeJob).filter(ScrapeJob.status == "PENDING").first()
+                if job:
+                    job.status = "RUNNING"
+                    db.commit()
+                    db.refresh(job)
+                    
+                    try:
+                        scraper = GitHubAPIScraper()
+                        def update_progress(job_id, current, total):
+                            with SessionLocal() as inner_db:
+                                j = inner_db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
+                                if j:
+                                    j.progress = current
+                                    j.total_expected = total
+                                    inner_db.commit()
+                        
+                        results = await scraper.scrape(job.query, job.total_expected, job.id, update_progress)
+                        
+                        # Save results to DB
+                        for res in results:
+                            scraped_result = ScrapedResult(
+                                user_id=job.user_id,
+                                query=job.query,
+                                github_url=res.get("github_url", ""),
+                                name=res.get("name"),
+                                email=res.get("email"),
+                                linkedin_url=res.get("linkedin_url"),
+                                repositories=res.get("repositories")
+                            )
+                            db.add(scraped_result)
+                            
+                        job.status = "COMPLETED"
+                        # Do not artificially bump progress, it represents actual fetched.
+                        db.commit()
+                    except Exception as e:
+                        job.status = "FAILED"
+                        job.error_message = str(e)
+                        db.commit()
+        except Exception as e:
+            print(f"Background worker error: {e}")
+            
+        await asyncio.sleep(5)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    worker_task = asyncio.create_task(background_job_worker())
+    yield
+    # Shutdown
+    worker_task.cancel()
+
+app = FastAPI(title="GitHub Data Scraper API with Auth & Database", lifespan=lifespan)
 
 # Auth & Security setup
 JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_jwt_key_2026")
@@ -396,67 +455,89 @@ def generate_ai_query(req: AiQueryRequest):
         except Exception as fallback_err:
             raise HTTPException(status_code=500, detail=f"AI Agent Error: {str(e)}")
 
-@app.post("/api/scrape")
-def start_scrape(
+@app.post("/api/jobs/start")
+def start_job(
     req: ScrapeRequest, 
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
 ):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty.")
-
-    task_id = str(uuid.uuid4())
-    user_id = current_user.id if current_user else None
-
-    tasks_db[task_id] = {
-        "task_id": task_id,
-        "query": req.query,
-        "max_results": req.max_results,
-        "status": "pending",
-        "progress": 0,
-        "logs": [],
-        "results": [],
-        "csv_file": None,
-        "excel_file": None,
-        "error": None
-    }
-
-    thread = threading.Thread(
-        target=run_scraper_task, 
-        args=(task_id, req.query, req.max_results, user_id)
-    )
-    thread.daemon = True
-    thread.start()
-
-    return {"task_id": task_id, "status": "pending"}
-
-@app.get("/api/status/{task_id}")
-def get_status(task_id: str):
-    if task_id not in tasks_db:
-        raise HTTPException(status_code=404, detail="Task not found.")
-    return tasks_db[task_id]
-
-@app.get("/api/download/{task_id}/{file_format}")
-def download_file(task_id: str, file_format: str):
-    if task_id not in tasks_db:
-        raise HTTPException(status_code=404, detail="Task not found.")
+        
+    user_id = current_user.id if current_user else 1 # Default to 1 if no auth for local testing
+    job_id = str(uuid.uuid4())
     
-    task = tasks_db[task_id]
-    if task["status"] != "completed":
-        raise HTTPException(status_code=400, detail="Task is not yet completed.")
+    new_job = ScrapeJob(
+        id=job_id,
+        user_id=user_id,
+        query=req.query,
+        status="PENDING",
+        progress=0,
+        total_expected=req.max_results
+    )
+    db.add(new_job)
+    db.commit()
+    
+    return {"job_id": job_id, "status": "PENDING"}
 
+@app.get("/api/jobs/status/{job_id}")
+def get_job_status(job_id: str, db: Session = Depends(get_db)):
+    job = db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+        
+    response = {
+        "job_id": job.id,
+        "query": job.query,
+        "status": job.status,
+        "progress": job.progress,
+        "total_expected": job.total_expected,
+        "error_message": job.error_message,
+        "results": []
+    }
+    
+    if job.status == "COMPLETED":
+        results = db.query(ScrapedResult).filter(ScrapedResult.query == job.query, ScrapedResult.user_id == job.user_id).all()
+        response["results"] = [
+            {
+                "github_url": r.github_url,
+                "name": r.name,
+                "email": r.email,
+                "linkedin_url": r.linkedin_url,
+                "repositories": r.repositories
+            } for r in results
+        ]
+        
+    return response
+
+@app.get("/api/download/{job_id}/{file_format}")
+def download_file(job_id: str, file_format: str, db: Session = Depends(get_db)):
+    job = db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if job.status != "COMPLETED":
+        raise HTTPException(status_code=400, detail="Job is not yet completed.")
+
+    results = db.query(ScrapedResult).filter(ScrapedResult.query == job.query, ScrapedResult.user_id == job.user_id).all()
+    if not results:
+        raise HTTPException(status_code=404, detail="No results found for this job.")
+
+    data = [{
+        "github_url": r.github_url,
+        "name": r.name,
+        "email": r.email,
+        "linkedin_url": r.linkedin_url,
+        "repositories": r.repositories
+    } for r in results]
+    df = pd.DataFrame(data)
+    
     file_format = file_format.lower()
     if file_format == "csv":
-        filepath = task.get("csv_file")
-        filename = f"github_users_{task_id[:8]}.csv"
-        media_type = "text/csv"
+        filepath = os.path.join(OUTPUTS_DIR, f"results_{job_id[:8]}.csv")
+        df.to_csv(filepath, index=False)
+        return FileResponse(filepath, media_type="text/csv", filename=f"github_users_{job_id[:8]}.csv")
     elif file_format in ["excel", "xlsx"]:
-        filepath = task.get("excel_file")
-        filename = f"github_users_{task_id[:8]}.xlsx"
-        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    else:
-        raise HTTPException(status_code=400, detail="Invalid format. Use 'csv' or 'excel'.")
+        filepath = os.path.join(OUTPUTS_DIR, f"results_{job_id[:8]}.xlsx")
+        df.to_excel(filepath, index=False)
+        return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"github_users_{job_id[:8]}.xlsx")
 
-    if not filepath or not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail="Export file not found.")
-
-    return FileResponse(filepath, filename=filename, media_type=media_type)
