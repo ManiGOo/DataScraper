@@ -1,0 +1,26 @@
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Output datasets
+outputs/
+*.csv
+*.xlsx
+
+# Playwright & OS caches
+.cache/
+.DS_Store
+.vscode/
+.idea/

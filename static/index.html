@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub User Scraper & Contact Intelligence</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header-card">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>GitHub Data Scraper</h1>
+                    <p class="subtitle">Extract Profiles, Emails & LinkedIn URLs with AI Intelligence</p>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-dot"></span>
+                <span id="statusText">System Ready</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- AI Search Assistant Panel -->
+            <section class="glass-card ai-card">
+                <div class="card-header">
+                    <div class="flex-align">
+                        <span class="ai-sparkle-icon">✨</span>
+                        <h2>AI Search Helper</h2>
+                    </div>
+                    <span class="badge badge-ai">Groq gpt-oss-20b</span>
+                </div>
+                <p class="ai-desc">Describe what developers you want to find in plain English, and AI will build the GitHub search query for you.</p>
+
+                <div class="ai-input-row">
+                    <input 
+                        type="text" 
+                        id="aiPromptInput" 
+                        placeholder="e.g. Find Python developers in India who are students with more than 10 repos" 
+                        onkeydown="if(event.key === 'Enter') generateAiQuery();"
+                    />
+                    <button type="button" id="btnAiGenerate" onclick="generateAiQuery()" class="btn-ai">
+                        <span>Generate Query</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Search Query Panel -->
+            <section class="glass-card search-card">
+                <div class="card-header">
+                    <h2>Search Parameters</h2>
+                    <span class="badge">Configurable</span>
+                </div>
+                
+                <form id="scrapeForm" onsubmit="event.preventDefault(); startScraping();">
+                    <div class="form-group">
+                        <label for="queryInput">GitHub Search Query</label>
+                        <div class="input-wrapper">
+                            <input 
+                                type="text" 
+                                id="queryInput" 
+                                placeholder="e.g. student location:India language:Python repos:>10 type:user"
+                                value="student location:India language:Python repos:>10 type:user"
+                                required
+                            />
+                            <button type="button" class="btn-clear" onclick="document.getElementById('queryInput').value=''">×</button>
+                        </div>
+                    </div>
+
+                    <div class="preset-chips">
+                        <span class="preset-label">Sample Presets:</span>
+                        <button type="button" class="chip" onclick="setQuery('student location:India language:Python repos:>10 type:user')">India Python Students</button>
+                        <button type="button" class="chip" onclick="setQuery('location:San Francisco language:TypeScript repos:>20 type:user')">SF TS Devs</button>
+                        <button type="button" class="chip" onclick="setQuery('location:London language:Go type:user')">London Go Devs</button>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="maxResults">Max Profiles to Scrape</label>
+                            <select id="maxResults">
+                                <option value="5">5 Profiles (Fast Test)</option>
+                                <option value="10" selected>10 Profiles (Standard)</option>
+                                <option value="20">20 Profiles</option>
+                                <option value="50">50 Profiles</option>
+                            </select>
+                        </div>
+                        <div class="form-group flex-submit">
+                            <button type="submit" id="btnScrape" class="btn-primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <span>Start Scraper</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Progress & Terminal Log Section -->
+            <section id="progressSection" class="glass-card progress-card hidden">
+                <div class="card-header">
+                    <div class="flex-align">
+                        <div class="spinner" id="spinner"></div>
+                        <h3>Scraping Execution Progress</h3>
+                    </div>
+                    <span id="progressPercent" class="percent-badge">0%</span>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar" style="width: 0%;"></div>
+                </div>
+
+                <div class="terminal-container">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Live System Logs</span>
+                        <span class="terminal-dots"><span></span><span></span><span></span></span>
+                    </div>
+                    <div id="terminalLog" class="terminal-log">
+                        <div class="log-line text-muted">[System] Ready for execution request.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Data Table Section -->
+            <section id="resultsSection" class="glass-card results-card hidden">
+                <div class="results-header">
+                    <div>
+                        <h2>Extracted User Profiles</h2>
+                        <p id="summaryStats" class="results-summary">Found 0 profile records</p>
+                    </div>
+                    <div class="export-actions">
+                        <button id="btnDownloadCsv" onclick="downloadFile('csv')" class="btn-secondary btn-export">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>Download CSV</span>
+                        </button>
+                        <button id="btnDownloadExcel" onclick="downloadFile('excel')" class="btn-success btn-export">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            <span>Download Excel</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>LinkedIn URL</th>
+                                <th>GitHub Profile</th>
+                                <th>Repos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Dynamic Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
