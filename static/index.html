@@ -200,12 +200,15 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div id="paginationControls" class="pagination-controls hidden" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem;">
+                    <button id="btnPrevPage" onclick="prevPage()" class="btn-secondary" style="padding: 0.5rem 1rem;">← Prev</button>
+                    <span id="pageIndicator" style="color: var(--text-secondary); font-size: 0.9rem;">Page 1 of 1</span>
+                    <button id="btnNextPage" onclick="nextPage()" class="btn-secondary" style="padding: 0.5rem 1rem;">Next →</button>
+                </div>
             </section>
         </main>
     </div>
-
-
-
 
 
     <script src="/static/app.js"></script>

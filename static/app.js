@@ -199,7 +199,7 @@ async function startScraping() {
     }
 
     try {
-        const response = await fetch('/api/scrape', {
+        const response = await fetch('/api/jobs/start', {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({ query: query, max_results: maxResults })
@@ -211,9 +211,9 @@ async function startScraping() {
         }
 
         const data = await response.json();
-        currentTaskId = data.task_id;
+        currentTaskId = data.job_id;
         
-        pollInterval = setInterval(checkStatus, 1000);
+        pollInterval = setInterval(checkStatus, 3000);
 
     } catch (err) {
         alert("Error starting scraper: " + err.message);
@@ -227,7 +227,7 @@ async function checkStatus() {
     if (!currentTaskId) return;
 
     try {
-        const response = await fetch(`/api/status/${currentTaskId}`);
+        const response = await fetch(`/api/jobs/status/${currentTaskId}`);
         if (!response.ok) return;
 
         const data = await response.json();
@@ -236,20 +236,23 @@ async function checkStatus() {
         const progressPercent = document.getElementById('progressPercent');
         const terminalLog = document.getElementById('terminalLog');
 
-        progressBar.style.width = `${data.progress}%`;
-        progressPercent.innerText = `${data.progress}%`;
-
-        if (data.logs && data.logs.length > 0) {
-            terminalLog.innerHTML = data.logs.map(log => `<div class="log-line">> ${log}</div>`).join('');
-            terminalLog.scrollTop = terminalLog.scrollHeight;
+        let pct = 0;
+        if (data.total_expected > 0) {
+            pct = Math.floor((data.progress / data.total_expected) * 100);
         }
 
-        if (data.status === 'completed') {
+        progressBar.style.width = `${pct}%`;
+        progressPercent.innerText = `${pct}%`;
+
+        terminalLog.innerHTML = `<div class="log-line">> Status: ${data.status} | Fetched: ${data.progress} / ${data.total_expected}</div>`;
+        terminalLog.scrollTop = terminalLog.scrollHeight;
+
+        if (data.status === 'COMPLETED') {
             clearInterval(pollInterval);
             finishScraping(data);
-        } else if (data.status === 'failed') {
+        } else if (data.status === 'FAILED') {
             clearInterval(pollInterval);
-            alert("Scraping task failed: " + (data.error || "Unknown error"));
+            alert("Scraping failed: " + data.error_message);
             resetUI();
         }
     } catch (err) {
@@ -257,10 +260,83 @@ async function checkStatus() {
     }
 }
 
+let globalResults = [];
+let currentPage = 1;
+const pageSize = 50;
+
+function renderTablePage() {
+    const tableBody = document.getElementById('tableBody');
+    const paginationControls = document.getElementById('paginationControls');
+    const pageIndicator = document.getElementById('pageIndicator');
+    const btnPrevPage = document.getElementById('btnPrevPage');
+    const btnNextPage = document.getElementById('btnNextPage');
+
+    if (globalResults.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No profile results found for query. Try modifying your search parameters or preset tags.</td></tr>`;
+        paginationControls.classList.add('hidden');
+        return;
+    }
+
+    const totalPages = Math.ceil(globalResults.length / pageSize);
+    if (totalPages > 1) {
+        paginationControls.classList.remove('hidden');
+    } else {
+        paginationControls.classList.add('hidden');
+    }
+
+    pageIndicator.innerText = `Page ${currentPage} of ${totalPages}`;
+    btnPrevPage.disabled = currentPage === 1;
+    btnNextPage.disabled = currentPage === totalPages;
+
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, globalResults.length);
+    const pageData = globalResults.slice(startIdx, endIdx);
+
+    tableBody.innerHTML = pageData.map((row, idx) => {
+        const absoluteIdx = startIdx + idx + 1;
+        const name = row.name || 'N/A';
+        const emailHtml = (row.email && row.email !== 'N/A') 
+            ? `<span class="badge-email">${row.email}</span>` 
+            : `<span class="badge-na">N/A</span>`;
+
+        const linkedinHtml = (row.linkedin_url && row.linkedin_url !== 'N/A') 
+            ? `<a href="${row.linkedin_url}" target="_blank" class="badge-linkedin">View Profile ↗</a>` 
+            : `<span class="badge-na">N/A</span>`;
+
+        const githubHtml = `<a href="${row.github_url}" target="_blank" class="link-github">${row.github_url}</a>`;
+        const repos = row.repositories || '0';
+
+        return `
+            <tr>
+                <td>${absoluteIdx}</td>
+                <td><strong>${name}</strong></td>
+                <td>${emailHtml}</td>
+                <td>${linkedinHtml}</td>
+                <td>${githubHtml}</td>
+                <td>${repos}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function prevPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        renderTablePage();
+    }
+}
+
+function nextPage() {
+    const totalPages = Math.ceil(globalResults.length / pageSize);
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderTablePage();
+    }
+}
+
 function finishScraping(data) {
     const btnScrape = document.getElementById('btnScrape');
     const resultsSection = document.getElementById('resultsSection');
-    const tableBody = document.getElementById('tableBody');
     const summaryStats = document.getElementById('summaryStats');
 
     const spinner = document.getElementById('spinner');
@@ -283,41 +359,15 @@ function finishScraping(data) {
 
     resultsSection.classList.remove('hidden');
 
-    const results = data.results || [];
-    const emailsCount = results.filter(r => r.Email && r.Email !== 'N/A').length;
-    const linkedinCount = results.filter(r => r["LinkedIn URL"] && r["LinkedIn URL"] !== 'N/A').length;
+    globalResults = data.results || [];
+    currentPage = 1;
 
-    summaryStats.innerText = `Gathered ${results.length} profile(s) | Emails: ${emailsCount} | LinkedIn: ${linkedinCount}`;
+    const emailsCount = globalResults.filter(r => r.email && r.email !== 'N/A').length;
+    const linkedinCount = globalResults.filter(r => r.linkedin_url && r.linkedin_url !== 'N/A').length;
 
-    if (results.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No profile results found for query. Try modifying your search parameters or preset tags.</td></tr>`;
-        return;
-    }
+    summaryStats.innerText = `Gathered ${globalResults.length} profile(s) | Emails: ${emailsCount} | LinkedIn: ${linkedinCount}`;
 
-    tableBody.innerHTML = results.map((row, idx) => {
-        const name = row.Name || 'N/A';
-        const emailHtml = (row.Email && row.Email !== 'N/A') 
-            ? `<span class="badge-email">${row.Email}</span>` 
-            : `<span class="badge-na">N/A</span>`;
-
-        const linkedinHtml = (row["LinkedIn URL"] && row["LinkedIn URL"] !== 'N/A') 
-            ? `<a href="${row["LinkedIn URL"]}" target="_blank" class="badge-linkedin">View Profile ↗</a>` 
-            : `<span class="badge-na">N/A</span>`;
-
-        const githubHtml = `<a href="${row["GitHub URL"]}" target="_blank" class="link-github">${row["GitHub URL"]}</a>`;
-        const repos = row.Repositories || '0';
-
-        return `
-            <tr>
-                <td>${idx + 1}</td>
-                <td><strong>${name}</strong></td>
-                <td>${emailHtml}</td>
-                <td>${linkedinHtml}</td>
-                <td>${githubHtml}</td>
-                <td>${repos}</td>
-            </tr>
-        `;
-    }).join('');
+    renderTablePage();
 }
 
 function resetUI() {
