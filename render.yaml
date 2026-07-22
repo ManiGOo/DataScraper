@@ -13,3 +13,5 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: "openai/gpt-oss-20b"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
