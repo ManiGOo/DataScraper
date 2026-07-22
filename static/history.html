@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search History - GitHub Data Scraper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-container" style="padding-top: 3rem;">
+        <div class="glass-card">
+            <div class="card-header">
+                <h2>📜 Your Search History (Last 20 Queries)</h2>
+                <a href="/" class="btn-nav-action" style="text-decoration: none;">&larr; Back to Dashboard</a>
+            </div>
+            
+            <div id="historyListContainer" class="history-list" style="max-height: none;">
+                <div class="text-muted" style="padding: 2rem; text-align: center;">Loading your query history...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const authToken = localStorage.getItem('datascraper_token');
+        if (!authToken) {
+            window.location.href = '/login';
+        }
+
+        function escapeQuotes(str) {
+            if (!str) return '';
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        async function loadHistory() {
+            const container = document.getElementById('historyListContainer');
+            try {
+                const response = await fetch('/api/user/history', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load history');
+                const historyData = await response.json();
+
+                if (historyData.length === 0) {
+                    container.innerHTML = `<div class="text-muted" style="padding: 2rem; text-align: center;">No search queries recorded yet.</div>`;
+                    return;
+                }
+
+                container.innerHTML = historyData.map(item => `
+                    <div class="history-item">
+                        <div>
+                            <div class="history-query-text">${escapeQuotes(item.query)}</div>
+                            <div class="history-meta">Date: ${item.created_at} | Max Profiles: ${item.max_results}</div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                container.innerHTML = `<div style="color: #EF4444; padding: 2rem; text-align: center;">Error loading history: ${err.message}</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadHistory);
+    </script>
+</body>
+</html>

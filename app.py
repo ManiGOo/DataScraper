@@ -222,6 +222,22 @@ def read_signup():
             return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>Signup Page</h1>")
 
+@app.get("/history", response_class=HTMLResponse)
+def read_history():
+    history_file = os.path.join(STATIC_DIR, "history.html")
+    if os.path.exists(history_file):
+        with open(history_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>History Page</h1>")
+
+@app.get("/saved-data", response_class=HTMLResponse)
+def read_saved_data():
+    saved_file = os.path.join(STATIC_DIR, "saved-data.html")
+    if os.path.exists(saved_file):
+        with open(saved_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Saved Data Page</h1>")
+
 # Authentication Endpoints
 @app.post("/api/auth/register")
 def register_user(req: RegisterRequest, db: Session = Depends(get_db)):

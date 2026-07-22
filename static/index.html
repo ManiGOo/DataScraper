@@ -36,8 +36,8 @@
             <div class="user-nav">
                 <!-- Logged In User Pill (Only view since index is protected) -->
                 <div id="loggedInNav" class="user-profile-bar hidden">
-                    <button class="btn-nav-action" onclick="openHistoryModal()">📜 History (Last 20)</button>
-                    <button class="btn-nav-action" onclick="openSavedDataModal()">💾 Saved DB Data</button>
+                    <a href="/history" target="_blank" class="btn-nav-action" style="text-decoration: none;">📜 History (Last 20)</a>
+                    <a href="/saved-data" target="_blank" class="btn-nav-action" style="text-decoration: none;">💾 Saved DB Data</a>
                     <span id="userEmailBadge" class="user-badge">user@example.com</span>
                     <button class="btn-logout" onclick="logoutUser()">Logout</button>
                 </div>
@@ -206,46 +206,7 @@
 
 
 
-    <!-- History Modal (Last 20 Queries) -->
-    <div id="historyModal" class="modal-backdrop hidden">
-        <div class="modal-card modal-lg">
-            <div class="modal-header">
-                <h3>📜 Your Search History (Last 20 Queries)</h3>
-                <button class="modal-close" onclick="closeModal('historyModal')">×</button>
-            </div>
-            <div id="historyListContainer" class="history-list">
-                <!-- Dynamic History Items -->
-            </div>
-        </div>
-    </div>
 
-    <!-- Saved Data Modal -->
-    <div id="savedDataModal" class="modal-backdrop hidden">
-        <div class="modal-card modal-xl">
-            <div class="modal-header">
-                <h3>💾 Database Saved Candidate Profiles (Neon DB)</h3>
-                <button class="modal-close" onclick="closeModal('savedDataModal')">×</button>
-            </div>
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>LinkedIn URL</th>
-                            <th>GitHub Profile</th>
-                            <th>Repos</th>
-                            <th>Query & Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="savedDataTableBody">
-                        <!-- Dynamic Saved Rows -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
     <script src="/static/app.js"></script>
 </body>
