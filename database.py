@@ -34,6 +34,7 @@ class User(Base):
 
     queries = relationship("UserQuery", back_populates="owner", cascade="all, delete-orphan")
     scraped_data = relationship("ScrapedResult", back_populates="owner", cascade="all, delete-orphan")
+    jobs = relationship("ScrapeJob", back_populates="owner", cascade="all, delete-orphan")
 
 class UserQuery(Base):
     __tablename__ = "user_queries"
@@ -56,10 +57,25 @@ class ScrapedResult(Base):
     name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     linkedin_url = Column(Text, nullable=True)
+    social_links = Column(Text, nullable=True)
     repositories = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="scraped_data")
+
+class ScrapeJob(Base):
+    __tablename__ = "scrape_jobs"
+
+    id = Column(String(36), primary_key=True, index=True) # UUID
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    query = Column(Text, nullable=False)
+    status = Column(String(20), default="PENDING") # PENDING, RUNNING, COMPLETED, FAILED
+    progress = Column(Integer, default=0)
+    total_expected = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    owner = relationship("User", back_populates="jobs")
 
 def init_db():
     Base.metadata.create_all(bind=engine)

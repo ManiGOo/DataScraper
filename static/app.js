@@ -272,7 +272,7 @@ function renderTablePage() {
     const btnNextPage = document.getElementById('btnNextPage');
 
     if (globalResults.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No profile results found for query. Try modifying your search parameters or preset tags.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No profile results found for query. Try modifying your search parameters or preset tags.</td></tr>`;
         paginationControls.classList.add('hidden');
         return;
     }
@@ -303,6 +303,10 @@ function renderTablePage() {
             ? `<a href="${row.linkedin_url}" target="_blank" class="badge-linkedin">View Profile ↗</a>` 
             : `<span class="badge-na">N/A</span>`;
 
+        const socialHtml = (row.social_links && row.social_links !== 'N/A')
+            ? `<span style="font-size: 0.85rem; color: var(--text-secondary);">${row.social_links}</span>`
+            : `<span class="badge-na">N/A</span>`;
+
         const githubHtml = `<a href="${row.github_url}" target="_blank" class="link-github">${row.github_url}</a>`;
         const repos = row.repositories || '0';
 
@@ -312,6 +316,7 @@ function renderTablePage() {
                 <td><strong>${name}</strong></td>
                 <td>${emailHtml}</td>
                 <td>${linkedinHtml}</td>
+                <td>${socialHtml}</td>
                 <td>${githubHtml}</td>
                 <td>${repos}</td>
             </tr>

@@ -61,6 +61,7 @@ async def background_job_worker():
                                 name=res.get("name"),
                                 email=res.get("email"),
                                 linkedin_url=res.get("linkedin_url"),
+                                social_links=res.get("social_links"),
                                 repositories=res.get("repositories")
                             )
                             db.add(scraped_result)
@@ -504,6 +505,7 @@ def get_job_status(job_id: str, db: Session = Depends(get_db)):
                 "name": r.name,
                 "email": r.email,
                 "linkedin_url": r.linkedin_url,
+                "social_links": r.social_links,
                 "repositories": r.repositories
             } for r in results
         ]
@@ -527,6 +529,7 @@ def download_file(job_id: str, file_format: str, db: Session = Depends(get_db)):
         "name": r.name,
         "email": r.email,
         "linkedin_url": r.linkedin_url,
+        "social_links": r.social_links,
         "repositories": r.repositories
     } for r in results]
     df = pd.DataFrame(data)
