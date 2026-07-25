@@ -115,6 +115,7 @@
             display: grid;
             grid-template-columns: 400px 1fr;
             gap: 2rem;
+            align-items: start;
         }
 
         .card {
@@ -124,6 +125,14 @@
             border-radius: 16px;
             padding: 1.5rem;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-sidebar {
+            position: sticky;
+            top: 1.5rem;
+            max-height: calc(100vh - 3rem);
+            overflow-y: auto;
+            z-index: 10;
         }
 
         .card-title {
@@ -591,7 +600,7 @@
 
         <div class="grid-layout">
             <!-- Sidebar Setup -->
-            <div class="card">
+            <div class="card card-sidebar">
                 <div class="card-title">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     Targeting Parameters
