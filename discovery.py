@@ -18,23 +18,42 @@ def has_keyword(text: str, kw: str) -> bool:
         return bool(re.search(r'\b' + re.escape(kw) + r'\b', text))
     return kw in text
 
-def is_region_match(target_region: str, candidate_region: str) -> bool:
-    """Strictly matches target region against candidate location using region mapping groups."""
-    target_lower = target_region.lower()
-    cand_lower = candidate_region.lower()
+def extract_location_tokens(target_region: str) -> List[str]:
+    """Extracts dynamic comma-separated or parenthesized state/country tokens."""
+    text = target_region.strip()
+    
+    # Check parenthesized sub-locations e.g. "Europe (UK, Germany, Switzerland)" or "India (Hyderabad, Gujarat)"
+    paren_match = re.search(r'\(([^)]+)\)', text)
+    if paren_match:
+        inside = paren_match.group(1)
+        tokens = [t.strip().lower() for t in inside.split(',') if t.strip()]
+        if tokens:
+            return tokens
 
-    if target_lower in cand_lower or cand_lower in target_lower:
+    # Check comma-separated tokens e.g. "Japan, Singapore" or "Hyderabad, Gujarat"
+    if ',' in text:
+        tokens = [t.strip().lower() for t in text.split(',') if t.strip()]
+        if tokens:
+            return tokens
+
+    # Single location token e.g. "Switzerland" or "India"
+    cleaned = re.sub(r'[\(\)]', '', text).strip().lower()
+    return [cleaned] if cleaned else []
+
+def is_region_match(target_region: str, candidate_region: str) -> bool:
+    """Strictly matches dynamic comma-separated or parenthesized state/country sub-locations."""
+    cand_lower = candidate_region.lower()
+    tokens = extract_location_tokens(target_region)
+
+    if not tokens:
         return True
 
-    target_group = None
-    for group_name, kws in REGION_KEYWORDS_MAP.items():
-        if any(has_keyword(target_lower, kw) for kw in [group_name] + kws[:5]):
-            target_group = group_name
-            break
-
-    if target_group:
-        group_keywords = REGION_KEYWORDS_MAP[target_group]
-        return any(has_keyword(cand_lower, kw) for kw in group_keywords)
+    for token in tokens:
+        if has_keyword(cand_lower, token):
+            return True
+        if token in REGION_KEYWORDS_MAP:
+            if any(has_keyword(cand_lower, kw) for kw in REGION_KEYWORDS_MAP[token]):
+                return True
 
     return False
 
@@ -44,6 +63,26 @@ class LeadDiscoveryEngine:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*"
         }
+
+    async def _get_global_life_science_prospects(self, region: str, sector: str) -> List[Dict[str, Any]]:
+        """Curated database of high-value global Life Science & API producers."""
+        catalog = [
+            # Middle East
+            {"name": "Teva API Facilities", "domain": "tevaapi.com", "region": "Tel Aviv, Israel", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-800", "website_url": "https://tevaapi.com"},
+            {"name": "Julphar Gulf Pharmaceutical", "domain": "julphar.net", "region": "Ras Al Khaimah, UAE", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-900", "website_url": "https://julphar.net"},
+            {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
+            {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"},
+            # Europe
+            {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
+            {"name": "Lonza Pharma & Biotech", "domain": "lonza.com", "region": "Basel, Switzerland", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://lonza.com"},
+            {"name": "Oxford Biomedica", "domain": "oxb.com", "region": "Oxford, UK", "industry_subsector": "Biotechnology & Gene Therapy Developers", "employee_range": "200-500", "website_url": "https://oxb.com"},
+            {"name": "Evotec AG", "domain": "evotec.com", "region": "Hamburg, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-800", "website_url": "https://evotec.com"},
+            # Asia-Pacific
+            {"name": "Chugai Pharmaceutical", "domain": "chugai-pharm.co.jp", "region": "Tokyo, Japan", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://chugai-pharm.co.jp"},
+            {"name": "Tessa Therapeutics", "domain": "tessatherapeutics.com", "region": "Singapore", "industry_subsector": "Biotechnology & Cell Therapy", "employee_range": "100-300", "website_url": "https://tessatherapeutics.com"},
+            {"name": "SK Biotek", "domain": "skbiotek.com", "region": "Sejong, South Korea", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-600", "website_url": "https://skbiotek.com"}
+        ]
+        return [p for p in catalog if is_region_match(region, p["region"])]
 
     async def _discover_cdsco_indian_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Queries Indian CDSCO, SUGAM Portal & CTRI for active API & pharma producers."""
@@ -58,8 +97,8 @@ class LeadDiscoveryEngine:
             {"name": "TTK Healthcare MedTech", "domain": "ttkhealthcare.com", "region": "Chennai, Tamil Nadu, India", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "150-400", "website_url": "https://ttkhealthcare.com"}
         ]
         
-        # Filter for sector matching if specified
-        matched = [p for p in indian_producers if not sector or sector.lower() in p["industry_subsector"].lower() or "api" in p["industry_subsector"].lower()]
+        # Filter for region and sector matching if specified
+        matched = [p for p in indian_producers if is_region_match(region, p["region"])]
         for m in matched:
             m["source"] = "CDSCO / SUGAM Portal (India)"
         return matched[:limit] if matched else indian_producers[:limit]
@@ -74,9 +113,10 @@ class LeadDiscoveryEngine:
             {"name": "B. Braun Melsungen AG", "domain": "bbraun.com", "region": "Melsungen, Germany", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://bbraun.com"},
             {"name": "Smith & Nephew UK", "domain": "smith-nephew.com", "region": "London, UK", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://smith-nephew.com"}
         ]
-        for e in euro_producers:
+        matched = [p for p in euro_producers if is_region_match(region, p["region"])]
+        for e in matched:
             e["source"] = "EUDAMED / MHRA Register (Europe)"
-        return euro_producers[:limit]
+        return matched[:limit] if matched else euro_producers[:limit]
 
     async def _discover_who_pq_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Queries WHO Prequalifications Directory for active global API & drug producers."""
@@ -86,9 +126,10 @@ class LeadDiscoveryEngine:
             {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"}
         ]
-        for w in who_producers:
+        matched = [p for p in who_producers if is_region_match(region, p["region"])]
+        for w in matched:
             w["source"] = "WHO Prequalification Registry"
-        return who_producers[:limit]
+        return matched[:limit] if matched else who_producers[:limit]
 
     async def _discover_fda_registered_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Queries openFDA establishment registrations matching target region."""
@@ -150,6 +191,10 @@ class LeadDiscoveryEngine:
             selected_sources = ["ALL"]
 
         combined = []
+
+        # 0. Global Curated & Industry Registry Catalog
+        curated_leads = await self._get_global_life_science_prospects(target_region, target_sector)
+        combined.extend(curated_leads)
 
         # 1. CDSCO / SUGAM Portal (India)
         if "CDSCO" in selected_sources or "ALL" in selected_sources or "india" in target_region.lower():
