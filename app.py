@@ -56,7 +56,11 @@ async def background_sdr_worker():
                         )
                         
                         processed_count = 0
+                        processed_domains = set()
                         for lead_item in raw_leads:
+                            if lead_item["domain"] in processed_domains:
+                                continue
+                            processed_domains.add(lead_item["domain"])
                             # 2. Crawl Company Domain for QMS keywords
                             crawl_data = await domain_crawler.crawl_domain(
                                 domain=lead_item["domain"],
@@ -252,26 +256,36 @@ def export_leads(campaign_id: str, file_format: str, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="No leads found for export.")
 
     rows = []
+    seen_domains = set()
     for lead in leads:
+        if lead.domain in seen_domains:
+            continue
+        seen_domains.add(lead.domain)
+
         drivers = ", ".join(json.loads(lead.compliance_drivers)) if lead.compliance_drivers else ""
-        for contact in lead.contacts:
-            step1 = next((s for s in contact.sequences if s.step_number == 1), None)
-            rows.append({
-                "Company Name": lead.name,
-                "Domain": lead.domain,
-                "Region": lead.region,
-                "Sub-sector": lead.industry_subsector,
-                "QMS Fit Score": lead.qms_fit_score,
-                "Compliance Drivers": drivers,
-                "Contact Name": contact.name,
-                "Title": contact.title,
-                "Work Email": contact.email,
-                "Email Status": contact.verification_status,
-                "LinkedIn": contact.linkedin_url,
-                "Email Subject": step1.subject if step1 else "",
-                "Personalized Hook": step1.personalized_hook if step1 else "",
-                "Lead Source": lead.source
-            })
+        contacts = lead.contacts or []
+        c1 = contacts[0] if len(contacts) > 0 else None
+        c2 = contacts[1] if len(contacts) > 1 else None
+
+        step1 = next((s for s in c1.sequences if s.step_number == 1), None) if (c1 and c1.sequences) else None
+
+        rows.append({
+            "Company Name": lead.name,
+            "Domain": lead.domain,
+            "Region": lead.region,
+            "Sub-sector": lead.industry_subsector,
+            "QMS Fit Score": lead.qms_fit_score,
+            "Compliance Drivers": drivers,
+            "Primary Contact": c1.name if c1 else "",
+            "Primary Title": c1.title if c1 else "",
+            "Primary Work Email": c1.email if c1 else "",
+            "Secondary Contact": c2.name if c2 else "",
+            "Secondary Title": c2.title if c2 else "",
+            "Secondary Work Email": c2.email if c2 else "",
+            "Email Subject": step1.subject if step1 else "",
+            "Personalized Hook": step1.personalized_hook if step1 else "",
+            "Lead Source": lead.source
+        })
 
     df = pd.DataFrame(rows)
     fmt = file_format.lower()
