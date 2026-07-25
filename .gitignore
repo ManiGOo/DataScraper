@@ -14,10 +14,12 @@ __pycache__/
 *$py.class
 *.so
 
-# Output datasets
+# Output datasets & local SQLite DB
 outputs/
 *.csv
 *.xlsx
+app.db
+app.db*
 
 # Playwright & OS caches
 .cache/
