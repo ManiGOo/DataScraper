@@ -2,11 +2,45 @@ let currentCampaignId = null;
 let pollInterval = null;
 let currentLeadsData = [];
 
+// Searchable Custom Multi-Select Dropdown Functions
+function toggleRegistryDropdown(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('registryDropdownMenu');
+    menu.classList.toggle('hidden');
+    if (!menu.classList.contains('hidden')) {
+        document.getElementById('registrySearchInput').focus();
+    }
+}
+
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('registryDropdownMenu');
+    const btn = document.getElementById('registryDropdownBtn');
+    if (menu && !menu.classList.contains('hidden')) {
+        if (!menu.contains(event.target) && !btn.contains(event.target)) {
+            menu.classList.add('hidden');
+        }
+    }
+});
+
+function filterRegistryOptions() {
+    const query = document.getElementById('registrySearchInput').value.toLowerCase();
+    const items = document.querySelectorAll('.dropdown-option-item');
+    items.forEach(item => {
+        const text = item.innerText.toLowerCase();
+        if (text.includes(query)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
 function toggleSources(masterCb) {
     const checkboxes = document.querySelectorAll('.src-checkbox');
     if (masterCb.checked) {
         checkboxes.forEach(cb => cb.checked = false);
     }
+    updateDropdownButtonText();
 }
 
 function updateSourceCheckboxes() {
@@ -16,6 +50,22 @@ function updateSourceCheckboxes() {
         masterCb.checked = false;
     } else {
         masterCb.checked = true;
+    }
+    updateDropdownButtonText();
+}
+
+function updateDropdownButtonText() {
+    const textSpan = document.getElementById('selectedRegistriesText');
+    const masterCb = document.getElementById('srcALL');
+    const checkedboxes = document.querySelectorAll('.src-checkbox:checked');
+
+    if (masterCb.checked || checkedboxes.length === 0) {
+        textSpan.innerText = "🌐 All Global Registries (Recommended)";
+    } else if (checkedboxes.length === 1) {
+        const labelText = checkedboxes[0].parentElement.innerText.trim();
+        textSpan.innerText = labelText;
+    } else {
+        textSpan.innerText = `${checkedboxes.length} Registries Selected`;
     }
 }
 
@@ -58,6 +108,7 @@ function setPreset(region) {
         srcALL.checked = true;
         document.querySelectorAll('.src-checkbox').forEach(cb => cb.checked = false);
     }
+    updateDropdownButtonText();
 }
 
 async function startSdrCampaign() {
