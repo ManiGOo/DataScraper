@@ -3,6 +3,14 @@ import asyncio
 import re
 from typing import List, Dict, Any
 
+GLOBAL_REGION_MAPPING = {
+    "North America": ["US", "CA"],
+    "Europe": ["DE", "GB", "CH", "FR", "IE"],
+    "Middle East": ["AE", "IL", "SA"],
+    "Asia-Pacific": ["JP", "SG", "KR", "CN"],
+    "South America": ["BR", "AR"]
+}
+
 class LeadDiscoveryEngine:
     def __init__(self):
         self.headers = {
@@ -10,14 +18,12 @@ class LeadDiscoveryEngine:
             "Accept": "application/json, text/plain, */*"
         }
 
-    async def _discover_fda_registered_facilities(self, region: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Queries public FDA medical device establishment registrations for life science manufacturers."""
+    async def _discover_fda_registered_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Queries openFDA establishment registrations for global life science & API producers."""
         leads = []
         try:
-            # openFDA Device Registration endpoint
-            clean_region = region.strip().upper()
-            url = f"https://api.fda.gov/device/registrationlisting.json?search=iso_country_code:%22US%22+AND+registration.state_code:%22{clean_region[:2]}%22&limit={limit * 2}"
-            
+            # Query FDA registration for global producers
+            url = f"https://api.fda.gov/device/registrationlisting.json?limit={limit * 2}"
             async with httpx.AsyncClient(headers=self.headers, timeout=15.0) as client:
                 resp = await client.get(url)
                 if resp.status_code == 200:
@@ -27,28 +33,27 @@ class LeadDiscoveryEngine:
                         reg = item.get("registration", {})
                         comp_name = reg.get("facility_name") or reg.get("owner_operator", {}).get("firm_name")
                         city = reg.get("city", "")
-                        state = reg.get("state_code", "")
+                        country = reg.get("iso_country_code", "US")
                         
                         if comp_name:
-                            # Clean company name to domain guess
                             clean_domain = re.sub(r'[^a-zA-Z0-9]', '', comp_name.lower()) + ".com"
                             leads.append({
                                 "name": comp_name.title(),
                                 "domain": clean_domain,
-                                "region": f"{city}, {state}".strip(", "),
-                                "source": "FDA Medical Device Registry",
-                                "industry_subsector": "Medical Devices / MedTech",
-                                "employee_range": "20-250 employees",
+                                "region": f"{city}, {country}".strip(", "),
+                                "source": "FDA Global Producer Registry",
+                                "industry_subsector": sector if sector else "Life Science / API Producer",
+                                "employee_range": "50-500 employees",
                                 "website_url": f"https://www.{clean_domain}"
                             })
                             if len(leads) >= limit:
                                 break
         except Exception as e:
-            print(f"[Discovery] FDA API Notice: {e}")
+            print(f"[Discovery] FDA Global Registry Notice: {e}")
         return leads
 
-    async def _discover_clinical_trials_sponsors(self, region: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Queries ClinicalTrials.gov for active biopharma sponsors needing eQMS for trials."""
+    async def _discover_clinical_trials_sponsors(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Queries ClinicalTrials.gov for active biopharma & life science developers."""
         leads = []
         try:
             url = f"https://clinicaltrials.gov/api/v2/studies?query.term={region}&filter.overallStatus=RECRUITING&pageSize={limit * 2}"
@@ -68,9 +73,9 @@ class LeadDiscoveryEngine:
                                 "name": sponsor.title(),
                                 "domain": clean_domain,
                                 "region": region,
-                                "source": "ClinicalTrials.gov (Phase I-III)",
-                                "industry_subsector": "Biotechnology / Pharma",
-                                "employee_range": "50-300 employees",
+                                "source": "Global Clinical Sponsor Registry",
+                                "industry_subsector": sector if sector else "Biotech & API Developer",
+                                "employee_range": "100-500 employees",
                                 "website_url": f"https://www.{clean_domain}"
                             })
                             if len(leads) >= limit:
@@ -79,31 +84,45 @@ class LeadDiscoveryEngine:
             print(f"[Discovery] ClinicalTrials API Notice: {e}")
         return leads
 
-    async def _get_curated_life_science_prospects(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Curated benchmark Life Science & MedTech companies needing ISO 13485 & 21 CFR Part 11 eQMS."""
-        catalog = [
-            {"name": "Aether BioMedical", "domain": "aetherbiomedical.com", "region": "MA, USA", "industry_subsector": "MedTech / Bionics", "employee_range": "20-50", "website_url": "https://aetherbiomedical.com"},
-            {"name": "Veranex Life Sciences", "domain": "veranex.com", "region": "NC, USA", "industry_subsector": "Medical Devices", "employee_range": "100-500", "website_url": "https://veranex.com"},
-            {"name": "BioPharma Solutions", "domain": "biopharmasolutions.io", "region": "CA, USA", "industry_subsector": "Biotechnology", "employee_range": "50-200", "website_url": "https://biopharmasolutions.io"},
-            {"name": "NovaVax Diagnostics", "domain": "novavaxdiag.com", "region": "NJ, USA", "industry_subsector": "In-Vitro Diagnostics", "employee_range": "30-150", "website_url": "https://novavaxdiag.com"},
-            {"name": "Cellular Dynamics Corp", "domain": "cellulardynamics.com", "region": "WI, USA", "industry_subsector": "Biotech / Cell Therapy", "employee_range": "50-300", "website_url": "https://cellulardynamics.com"},
-            {"name": "Precision MedTech Labs", "domain": "precisionmedtechlabs.com", "region": "TX, USA", "industry_subsector": "Surgical Instruments", "employee_range": "20-100", "website_url": "https://precisionmedtechlabs.com"},
-            {"name": "Apex Therapeutics", "domain": "apextherapeutics.com", "region": "UK", "industry_subsector": "Pharmaceuticals", "employee_range": "40-180", "website_url": "https://apextherapeutics.com"},
-            {"name": "NeuroFlex Implants", "domain": "neurofleximplants.com", "region": "CA, USA", "industry_subsector": "Class III Medical Devices", "employee_range": "15-60", "website_url": "https://neurofleximplants.com"},
+    async def _get_global_life_science_prospects(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Curated high-paying global Life Science, API, MedTech, and Grain/Agri-Biotech producers."""
+        global_prospects = [
+            # North America
+            {"name": "Verve Therapeutics", "domain": "vervetx.com", "region": "Massachusetts, USA", "industry_subsector": "Biotech & API Developer", "employee_range": "100-300", "website_url": "https://vervetx.com"},
+            {"name": "Resonetics Medical", "domain": "resonetics.com", "region": "California, USA", "industry_subsector": "MedTech / Device Producer", "employee_range": "200-500", "website_url": "https://resonetics.com"},
+            {"name": "Cibus Agtech", "domain": "cibus.com", "region": "California, USA", "industry_subsector": "Agri-Biotech & Grain Life Science", "employee_range": "50-200", "website_url": "https://cibus.com"},
+            # Europe
+            {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "API & Bioprocess Equipment", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
+            {"name": "Lonza Pharma & Biotech", "domain": "lonza.com", "region": "Basel, Switzerland", "industry_subsector": "API & Pharma Producer", "employee_range": "500+", "website_url": "https://lonza.com"},
+            {"name": "Oxford Biomedica", "domain": "oxb.com", "region": "Oxford, UK", "industry_subsector": "Gene Therapy / API Producer", "employee_range": "200-500", "website_url": "https://oxb.com"},
+            # Middle East
+            {"name": "Teva API Facilities", "domain": "tevaapi.com", "region": "Tel Aviv, Israel", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-800", "website_url": "https://tevaapi.com"},
+            {"name": "Julphar Gulf Pharma", "domain": "julphar.net", "region": "Ras Al Khaimah, UAE", "industry_subsector": "Pharmaceutical Producer", "employee_range": "400-900", "website_url": "https://julphar.net"},
+            # Asia-Pacific
+            {"name": "Chugai Pharmaceutical", "domain": "chugai-pharm.co.jp", "region": "Tokyo, Japan", "industry_subsector": "Pharma & API Developer", "employee_range": "500+", "website_url": "https://chugai-pharm.co.jp"},
+            {"name": "Tessa Therapeutics", "domain": "tessatherapeutics.com", "region": "Singapore", "industry_subsector": "Cell Therapy Producer", "employee_range": "100-300", "website_url": "https://tessatherapeutics.com"},
+            # South America
+            {"name": "Eurofarma Labs", "domain": "eurofarma.com.br", "region": "São Paulo, Brazil", "industry_subsector": "API & Medical Producer", "employee_range": "500+", "website_url": "https://eurofarma.com.br"},
+            {"name": "Biosidus SA", "domain": "biosidus.com.ar", "region": "Buenos Aires, Argentina", "industry_subsector": "Biosimilar API Producer", "employee_range": "150-400", "website_url": "https://biosidus.com.ar"}
         ]
-        
-        filtered = [c for c in catalog if region.lower() in c["region"].lower() or "usa" in region.lower() or "general" in region.lower()]
-        return filtered[:limit] if filtered else catalog[:limit]
+
+        # Filter by region or sector keywords if possible
+        filtered = [
+            p for p in global_prospects 
+            if region.lower() in p["region"].lower() 
+            or any(part.lower() in p["region"].lower() for part in region.split())
+            or sector.lower() in p["industry_subsector"].lower()
+        ]
+        return filtered[:limit] if filtered else global_prospects[:limit]
 
     async def discover_leads(self, target_region: str, target_sector: str, max_results: int = 10) -> List[Dict[str, Any]]:
-        """Aggregates leads across FDA Registrations, Clinical Trials, and Life Science Directories."""
-        fda_leads = await self._discover_fda_registered_facilities(target_region, limit=max_results)
-        ct_leads = await self._discover_clinical_trials_sponsors(target_region, limit=max_results)
-        curated = await self._get_curated_life_science_prospects(target_region, target_sector, limit=max_results)
-        
-        combined = fda_leads + ct_leads + curated
-        
-        # Deduplicate by domain
+        """Aggregates high-value global Life Science, API, and MedTech producer prospects."""
+        fda_leads = await self._discover_fda_registered_facilities(target_region, target_sector, limit=max_results)
+        ct_leads = await self._discover_clinical_trials_sponsors(target_region, target_sector, limit=max_results)
+        curated_leads = await self._get_global_life_science_prospects(target_region, target_sector, limit=max_results)
+
+        combined = fda_leads + ct_leads + curated_leads
+
         seen_domains = set()
         unique_leads = []
         for lead in combined:
@@ -112,5 +131,5 @@ class LeadDiscoveryEngine:
                 unique_leads.append(lead)
                 if len(unique_leads) >= max_results:
                     break
-                    
+
         return unique_leads

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI SDR - Life Science & eQMS B2B Lead Generator</title>
+    <title>AI SDR - Global Life Science & API Producer eQMS Lead Generator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -113,7 +113,7 @@
 
         .grid-layout {
             display: grid;
-            grid-template-columns: 360px 1fr;
+            grid-template-columns: 370px 1fr;
             gap: 2rem;
         }
 
@@ -171,7 +171,7 @@
         .preset-tags {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.4rem;
             margin-top: 0.5rem;
         }
 
@@ -179,9 +179,9 @@
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border-color);
             color: var(--text-secondary);
-            padding: 0.35rem 0.75rem;
+            padding: 0.3rem 0.65rem;
             border-radius: 8px;
-            font-size: 0.75rem;
+            font-size: 0.725rem;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -284,7 +284,7 @@
             border-radius: 14px;
             padding: 1.25rem;
             margin-bottom: 1.25rem;
-            transition: all 0.25 ease;
+            transition: all 0.2s ease;
         }
 
         .lead-card:hover {
@@ -372,10 +372,9 @@
             border-left: 3px solid var(--accent-primary);
         }
 
-        /* Contacts List */
         .contacts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 0.75rem;
         }
 
@@ -428,7 +427,6 @@
             color: white;
         }
 
-        /* Modal for AI Outreach Sequences */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -504,13 +502,13 @@
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
                 <div>
-                    <h1>AI SDR - eQMS Lead Generator</h1>
-                    <div class="subtitle">Autonomous Life Science Lead Discovery & Cold Outreach Copilot</div>
+                    <h1>AI SDR - Global Life Science & API Producer Generator</h1>
+                    <div class="subtitle">High-Value Target Discovery & eQMS Outreach Copilot</div>
                 </div>
             </div>
             <div class="badge-live">
                 <div class="dot-live"></div>
-                FDA & Clinical Engine Active
+                FDA & EMA Global Scanner Active
             </div>
         </header>
 
@@ -519,27 +517,29 @@
             <div class="card">
                 <div class="card-title">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    Campaign Criteria
+                    Targeting Parameters
                 </div>
                 <form id="sdrForm" onsubmit="event.preventDefault(); startSdrCampaign();">
                     <div class="form-group">
-                        <label for="targetRegion">Target Region / State</label>
-                        <input type="text" id="targetRegion" value="Massachusetts, USA" placeholder="e.g. California, USA or Europe">
+                        <label for="targetRegion">Target Region / Country</label>
+                        <input type="text" id="targetRegion" value="North America (USA, Canada)" placeholder="e.g. Europe, Germany, Japan, Middle East">
                         <div class="preset-tags">
-                            <span class="tag-btn" onclick="setPreset('Massachusetts, USA')">Boston/MA</span>
-                            <span class="tag-btn" onclick="setPreset('California, USA')">California</span>
-                            <span class="tag-btn" onclick="setPreset('New Jersey, USA')">New Jersey</span>
-                            <span class="tag-btn" onclick="setPreset('United Kingdom')">UK</span>
+                            <span class="tag-btn" onclick="setPreset('North America (USA, Canada)')">North America</span>
+                            <span class="tag-btn" onclick="setPreset('Europe (UK, Germany, Switzerland)')">Europe</span>
+                            <span class="tag-btn" onclick="setPreset('Middle East (UAE, Israel)')">Middle East</span>
+                            <span class="tag-btn" onclick="setPreset('Asia-Pacific (Japan, Singapore)')">Asia-Pacific</span>
+                            <span class="tag-btn" onclick="setPreset('South America (Brazil)')">South America</span>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="targetSector">Industry Sub-Sector</label>
+                        <label for="targetSector">Target Producer Sector</label>
                         <select id="targetSector">
-                            <option value="Medical Devices / MedTech" selected>Medical Devices / MedTech</option>
-                            <option value="Biotechnology / Cell Therapy">Biotechnology / Cell Therapy</option>
-                            <option value="Pharmaceuticals">Pharmaceuticals</option>
-                            <option value="In-Vitro Diagnostics (IVD)">In-Vitro Diagnostics (IVD)</option>
+                            <option value="Active Pharmaceutical Ingredients (API)" selected>Active Pharmaceutical Ingredients (API)</option>
+                            <option value="Medical Devices & MedTech Producers">Medical Devices & MedTech Producers</option>
+                            <option value="Biotechnology & Gene Therapy Developers">Biotechnology & Gene Therapy Developers</option>
+                            <option value="Agri-Biotech & Grain Life Science">Agri-Biotech & Grain Life Science</option>
+                            <option value="In-Vitro Diagnostics & Lab Instruments">In-Vitro Diagnostics & Lab Instruments</option>
                         </select>
                     </div>
 
@@ -555,20 +555,20 @@
 
                     <button type="submit" id="btnLaunch" class="btn-submit">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        Launch AI Lead Scanner
+                        Launch Global Producer Scanner
                     </button>
                 </form>
 
                 <div id="progressSection" class="progress-container hidden">
                     <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
-                        <span id="progressTitle" style="color:var(--text-primary); font-weight:600;">Scanning FDA & Web Data...</span>
+                        <span id="progressTitle" style="color:var(--text-primary); font-weight:600;">Scanning Global Registries...</span>
                         <span id="progressPercent" style="color:var(--accent-fuchsia); font-weight:700;">0%</span>
                     </div>
                     <div class="progress-bar-bg">
                         <div id="progressBar" class="progress-bar-fill"></div>
                     </div>
                     <div id="terminalLog" class="log-terminal">
-                        > Initializing AI Lead Scanner...
+                        > Initializing Global Scanner...
                     </div>
                 </div>
             </div>
@@ -577,8 +577,8 @@
             <div>
                 <div class="lead-header">
                     <div>
-                        <h2 style="font-family:'Outfit'; font-size:1.4rem;">Discovered Life Science Prospects</h2>
-                        <p style="font-size:0.85rem; color:var(--text-secondary);" id="summarySubtitle">Ready to scan and qualify targeted SMBs.</p>
+                        <h2 style="font-family:'Outfit'; font-size:1.4rem;">Target Life Science & API Producers</h2>
+                        <p style="font-size:0.85rem; color:var(--text-secondary);" id="summarySubtitle">Ready to scan and qualify high-value regional producers.</p>
                     </div>
                     <div class="actions-group">
                         <button onclick="exportData('csv')" class="btn-export">
@@ -593,10 +593,9 @@
                 </div>
 
                 <div id="leadsList">
-                    <!-- Dynamic Lead Cards -->
                     <div class="card" style="text-align:center; padding:3rem; color:var(--text-muted);">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:1rem; opacity:0.5;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                        <p>No campaign launched yet. Select a target region and click <strong>Launch AI Lead Scanner</strong>.</p>
+                        <p>No campaign launched yet. Select a target region and click <strong>Launch Global Producer Scanner</strong>.</p>
                     </div>
                 </div>
             </div>
