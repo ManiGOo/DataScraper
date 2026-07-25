@@ -46,11 +46,13 @@ async def background_sdr_worker():
                     campaign_id = campaign.id
                     
                     try:
-                        # 1. Discover Leads across FDA Registrations, Clinical Trials & Associations
+                        # 1. Discover Leads across Selected Regulatory Registries
+                        sel_sources = json.loads(campaign.selected_sources) if campaign.selected_sources else ["ALL"]
                         raw_leads = await discovery_engine.discover_leads(
                             target_region=campaign.target_region,
                             target_sector=campaign.target_sector,
-                            max_results=campaign.total_expected
+                            max_results=campaign.total_expected,
+                            selected_sources=sel_sources
                         )
                         
                         processed_count = 0
@@ -156,6 +158,7 @@ class StartCampaignRequest(BaseModel):
     target_region: str = "Massachusetts, USA"
     target_sector: str = "Medical Devices / MedTech"
     max_results: int = 5
+    selected_sources: Optional[List[str]] = ["ALL"]
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -168,13 +171,15 @@ def read_root():
 @app.post("/api/sdr/campaigns/start")
 def start_campaign(req: StartCampaignRequest, db: Session = Depends(get_db)):
     campaign_id = str(uuid.uuid4())
+    sources = req.selected_sources if req.selected_sources else ["ALL"]
     campaign = SdrCampaign(
         id=campaign_id,
         target_region=req.target_region,
         target_sector=req.target_sector,
         status="PENDING",
         progress=0,
-        total_expected=req.max_results
+        total_expected=req.max_results,
+        selected_sources=json.dumps(sources)
     )
     db.add(campaign)
     db.commit()

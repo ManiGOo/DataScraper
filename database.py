@@ -56,6 +56,7 @@ class SdrCampaign(Base):
     status = Column(String(50), default="PENDING")
     progress = Column(Integer, default=0)
     total_expected = Column(Integer, default=10)
+    selected_sources = Column(Text, nullable=True) # JSON list e.g. ["CDSCO", "FDA"]
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

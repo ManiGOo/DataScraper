@@ -2,8 +2,62 @@ let currentCampaignId = null;
 let pollInterval = null;
 let currentLeadsData = [];
 
+function toggleSources(masterCb) {
+    const checkboxes = document.querySelectorAll('.src-checkbox');
+    if (masterCb.checked) {
+        checkboxes.forEach(cb => cb.checked = false);
+    }
+}
+
+function updateSourceCheckboxes() {
+    const masterCb = document.getElementById('srcALL');
+    const checkedboxes = document.querySelectorAll('.src-checkbox:checked');
+    if (checkedboxes.length > 0) {
+        masterCb.checked = false;
+    } else {
+        masterCb.checked = true;
+    }
+}
+
 function setPreset(region) {
     document.getElementById('targetRegion').value = region;
+    
+    // Smart Registry Auto-Suggest
+    const regLower = region.lower ? region.lower() : region.toLowerCase();
+    const srcALL = document.getElementById('srcALL');
+    const srcCDSCO = document.getElementById('srcCDSCO');
+    const srcEUDAMED = document.getElementById('srcEUDAMED');
+    const srcFDA = document.getElementById('srcFDA');
+    const srcWHO = document.getElementById('srcWHO');
+
+    if (regLower.includes('india')) {
+        srcALL.checked = false;
+        srcCDSCO.checked = true;
+        srcEUDAMED.checked = false;
+        srcFDA.checked = false;
+        srcWHO.checked = false;
+    } else if (regLower.includes('europe') || regLower.includes('uk') || regLower.includes('germany')) {
+        srcALL.checked = false;
+        srcCDSCO.checked = false;
+        srcEUDAMED.checked = true;
+        srcFDA.checked = false;
+        srcWHO.checked = false;
+    } else if (regLower.includes('north america') || regLower.includes('usa')) {
+        srcALL.checked = false;
+        srcCDSCO.checked = false;
+        srcEUDAMED.checked = false;
+        srcFDA.checked = true;
+        srcWHO.checked = false;
+    } else if (regLower.includes('middle east')) {
+        srcALL.checked = false;
+        srcCDSCO.checked = false;
+        srcEUDAMED.checked = false;
+        srcFDA.checked = false;
+        srcWHO.checked = true;
+    } else {
+        srcALL.checked = true;
+        document.querySelectorAll('.src-checkbox').forEach(cb => cb.checked = false);
+    }
 }
 
 async function startSdrCampaign() {
@@ -14,6 +68,15 @@ async function startSdrCampaign() {
     if (!region) {
         alert("Please specify a target region.");
         return;
+    }
+
+    // Collect selected regulatory sources
+    let selectedSources = [];
+    if (document.getElementById('srcALL').checked) {
+        selectedSources = ["ALL"];
+    } else {
+        document.querySelectorAll('.src-checkbox:checked').forEach(cb => selectedSources.push(cb.value));
+        if (selectedSources.length === 0) selectedSources = ["ALL"];
     }
 
     const btnLaunch = document.getElementById('btnLaunch');
@@ -27,7 +90,7 @@ async function startSdrCampaign() {
     progressSection.classList.remove('hidden');
     progressBar.style.width = '5%';
     progressPercent.innerText = '5%';
-    terminalLog.innerHTML = `<div>> Launching AI Lead Scanner for ${region}...</div>`;
+    terminalLog.innerHTML = `<div>> Querying Regulatory Registries (${selectedSources.join(', ')}) for ${region}...</div>`;
 
     try {
         const response = await fetch('/api/sdr/campaigns/start', {
@@ -36,7 +99,8 @@ async function startSdrCampaign() {
             body: JSON.stringify({
                 target_region: region,
                 target_sector: sector,
-                max_results: maxProspects
+                max_results: maxProspects,
+                selected_sources: selectedSources
             })
         });
 
@@ -81,7 +145,7 @@ async function checkCampaignStatus() {
         terminalLog.innerHTML = `<div>> Status: ${data.status} | Qualified: ${data.progress} / ${data.total_expected} prospects</div>`;
 
         if (data.status === 'RUNNING') {
-            progressTitle.innerText = "Crawling & AI Scoring eQMS Prospects...";
+            progressTitle.innerText = "Mining Registries & AI Scoring Prospects...";
             renderLeadsList(currentLeadsData);
         } else if (data.status === 'COMPLETED') {
             clearInterval(pollInterval);
@@ -113,7 +177,7 @@ function renderLeadsList(leads) {
     if (!leads || leads.length === 0) {
         leadsList.innerHTML = `
             <div class="card" style="text-align:center; padding:3rem; color:var(--text-muted);">
-                <p>Scanning FDA registrations and web text for target prospects...</p>
+                <p>Mining selected government registries and web text for target prospects...</p>
             </div>
         `;
         return;

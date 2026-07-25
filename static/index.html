@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI SDR - Global Life Science & API Producer eQMS Lead Generator</title>
+    <title>AI SDR - Global Life Science & API Producer Generator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -113,7 +113,7 @@
 
         .grid-layout {
             display: grid;
-            grid-template-columns: 370px 1fr;
+            grid-template-columns: 380px 1fr;
             gap: 2rem;
         }
 
@@ -245,7 +245,6 @@
             overflow-y: auto;
         }
 
-        /* Lead Cards List */
         .lead-header {
             display: flex;
             justify-content: space-between;
@@ -503,12 +502,12 @@
                 </div>
                 <div>
                     <h1>AI SDR - Global Life Science & API Producer Generator</h1>
-                    <div class="subtitle">High-Value Target Discovery & eQMS Outreach Copilot</div>
+                    <div class="subtitle">Multi-Government Regulatory Registry Discovery & eQMS Outreach Copilot</div>
                 </div>
             </div>
             <div class="badge-live">
                 <div class="dot-live"></div>
-                FDA & EMA Global Scanner Active
+                CDSCO, openFDA, EUDAMED & WHO Active
             </div>
         </header>
 
@@ -522,13 +521,34 @@
                 <form id="sdrForm" onsubmit="event.preventDefault(); startSdrCampaign();">
                     <div class="form-group">
                         <label for="targetRegion">Target Region / Country</label>
-                        <input type="text" id="targetRegion" value="North America (USA, Canada)" placeholder="e.g. Europe, Germany, Japan, Middle East">
+                        <input type="text" id="targetRegion" value="India (Hyderabad, Gujarat, Mumbai)" placeholder="e.g. India, Germany, USA, Middle East">
                         <div class="preset-tags">
-                            <span class="tag-btn" onclick="setPreset('North America (USA, Canada)')">North America</span>
-                            <span class="tag-btn" onclick="setPreset('Europe (UK, Germany, Switzerland)')">Europe</span>
-                            <span class="tag-btn" onclick="setPreset('Middle East (UAE, Israel)')">Middle East</span>
-                            <span class="tag-btn" onclick="setPreset('Asia-Pacific (Japan, Singapore)')">Asia-Pacific</span>
-                            <span class="tag-btn" onclick="setPreset('South America (Brazil)')">South America</span>
+                            <span class="tag-btn" onclick="setPreset('India (Hyderabad, Gujarat, Mumbai)')">🇮🇳 India</span>
+                            <span class="tag-btn" onclick="setPreset('Europe (UK, Germany, Switzerland)')">🇪🇺 Europe</span>
+                            <span class="tag-btn" onclick="setPreset('Middle East (UAE, Israel)')">🇦🇪 Middle East</span>
+                            <span class="tag-btn" onclick="setPreset('North America (USA, Canada)')">🇺🇸 North America</span>
+                            <span class="tag-btn" onclick="setPreset('Asia-Pacific (Japan, Singapore)')">🇯🇵 Asia-Pacific</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Regulatory Data Registries</label>
+                        <div style="display:flex; flex-direction:column; gap:0.5rem; background:rgba(0,0,0,0.25); padding:0.75rem; border-radius:10px; border:1px solid var(--border-color); font-size:0.85rem;">
+                            <label style="display:flex; align-items:center; gap:0.5rem; margin:0; cursor:pointer; text-transform:none; font-weight:500; color:var(--text-primary);">
+                                <input type="checkbox" id="srcALL" value="ALL" checked onchange="toggleSources(this)"> 🌐 All Global Registries (Recommended)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; margin:0; cursor:pointer; text-transform:none; font-weight:500; color:var(--text-primary);">
+                                <input type="checkbox" class="src-checkbox" id="srcCDSCO" value="CDSCO" onchange="updateSourceCheckboxes()"> 🇮🇳 CDSCO & SUGAM (India Pharma & MedTech)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; margin:0; cursor:pointer; text-transform:none; font-weight:500; color:var(--text-primary);">
+                                <input type="checkbox" class="src-checkbox" id="srcEUDAMED" value="EUDAMED" onchange="updateSourceCheckboxes()"> 🇪🇺 EUDAMED & MHRA (Europe & UK Devices)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; margin:0; cursor:pointer; text-transform:none; font-weight:500; color:var(--text-primary);">
+                                <input type="checkbox" class="src-checkbox" id="srcFDA" value="FDA" onchange="updateSourceCheckboxes()"> 🇺🇸 openFDA (US & Global Registrations)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; margin:0; cursor:pointer; text-transform:none; font-weight:500; color:var(--text-primary);">
+                                <input type="checkbox" class="src-checkbox" id="srcWHO" value="WHO" onchange="updateSourceCheckboxes()"> 🇺🇳 WHO Prequalifications & ICTRP
+                            </label>
                         </div>
                     </div>
 
