@@ -1,255 +1,98 @@
-let currentTaskId = null;
+let currentCampaignId = null;
 let pollInterval = null;
-let conversationHistory = [];
-let authToken = localStorage.getItem('datascraper_token') || null;
+let currentLeadsData = [];
 
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuthStatus();
-});
+function setPreset(region) {
+    document.getElementById('targetRegion').value = region;
+}
 
-// Auth Functions
-function checkAuthStatus() {
-    if (!authToken) {
-        window.location.href = '/login';
+async function startSdrCampaign() {
+    const region = document.getElementById('targetRegion').value.trim();
+    const sector = document.getElementById('targetSector').value;
+    const maxProspects = parseInt(document.getElementById('maxProspects').value);
+
+    if (!region) {
+        alert("Please specify a target region.");
         return;
     }
 
-    fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-    .then(res => {
-        if (!res.ok) throw new Error('Token expired');
-        return res.json();
-    })
-    .then(user => {
-        renderLoggedInUI(user.email);
-    })
-    .catch(() => {
-        logoutUser();
-    });
-}
+    const btnLaunch = document.getElementById('btnLaunch');
+    const progressSection = document.getElementById('progressSection');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const terminalLog = document.getElementById('terminalLog');
 
-function renderLoggedInUI(email) {
-    document.getElementById('loggedInNav').classList.remove('hidden');
-    document.getElementById('userEmailBadge').innerText = email;
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.add('hidden');
-}
-
-function logoutUser() {
-    authToken = null;
-    localStorage.removeItem('datascraper_token');
-    window.location.href = '/login';
-}
-
-
-
-// AI Helper Functions
-function setQuery(queryText) {
-    const queryInput = document.getElementById('queryInput');
-    queryInput.value = queryText;
-    queryInput.focus();
-    queryInput.style.borderColor = 'var(--accent-cyan)';
-    queryInput.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.4)';
-    setTimeout(() => { 
-        queryInput.style.borderColor = ''; 
-        queryInput.style.boxShadow = ''; 
-    }, 1500);
-
-    document.querySelector('.search-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function clearAiMemory() {
-    conversationHistory = [];
-    document.getElementById('aiResponseContainer').classList.add('hidden');
-    document.getElementById('btnClearMemory').classList.add('hidden');
-    document.getElementById('aiPromptInput').value = '';
-}
-
-async function generateAiQuery() {
-    const promptInput = document.getElementById('aiPromptInput');
-    const btnAiGenerate = document.getElementById('btnAiGenerate');
-    const prompt = promptInput.value.trim();
-
-    if (!prompt) {
-        alert("Please enter a plain English description for the AI Assistant.");
-        return;
-    }
-
-    const origText = btnAiGenerate.innerHTML;
-    btnAiGenerate.disabled = true;
-    btnAiGenerate.innerHTML = `<span>Analyzing Request...</span>`;
+    btnLaunch.disabled = true;
+    btnLaunch.style.opacity = '0.6';
+    progressSection.classList.remove('hidden');
+    progressBar.style.width = '5%';
+    progressPercent.innerText = '5%';
+    terminalLog.innerHTML = `<div>> Launching AI Lead Scanner for ${region}...</div>`;
 
     try {
-        const response = await fetch('/api/generate-query', {
+        const response = await fetch('/api/sdr/campaigns/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                prompt: prompt,
-                history: conversationHistory 
+            body: JSON.stringify({
+                target_region: region,
+                target_sector: sector,
+                max_results: maxProspects
             })
         });
 
         if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Failed to generate AI query strategies.");
+            throw new Error("Failed to initialize AI campaign.");
         }
 
         const data = await response.json();
-        renderAiResults(data);
-
-        conversationHistory.push({ role: "user", content: prompt });
-        conversationHistory.push({ 
-            role: "assistant", 
-            content: `Reasoning: ${data.reasoning}\nQueries Generated: ${JSON.stringify(data.queries)}` 
-        });
-
-        document.getElementById('btnClearMemory').classList.remove('hidden');
-
-    } catch (err) {
-        alert("AI Search Agent Error: " + err.message);
-    } finally {
-        btnAiGenerate.disabled = false;
-        btnAiGenerate.innerHTML = origText;
-    }
-}
-
-function renderAiResults(data) {
-    const container = document.getElementById('aiResponseContainer');
-    const reasoningText = document.getElementById('aiReasoningText');
-    const queriesList = document.getElementById('aiQueriesList');
-
-    reasoningText.innerText = data.reasoning || "Analyzed user intent and formulated query parameters.";
-
-    const queries = data.queries || [];
-    if (queries.length === 0) {
-        queriesList.innerHTML = `<div class="text-muted">No query strategies returned.</div>`;
-    } else {
-        queriesList.innerHTML = queries.map((q, idx) => {
-            const title = q.title || `Strategy #${idx + 1}`;
-            const desc = q.description || 'Optimized GitHub query option.';
-            const queryStr = q.query || '';
-
-            return `
-                <div class="query-option-card">
-                    <div>
-                        <div class="query-card-header">
-                            <h4>${title}</h4>
-                        </div>
-                        <p class="query-desc">${desc}</p>
-                        <div class="query-code-preview">${queryStr}</div>
-                    </div>
-                    <button type="button" class="btn-use-query" onclick="setQuery('${escapeQuotes(queryStr)}')">
-                        <span>🚀 Use This Query</span>
-                    </button>
-                </div>
-            `;
-        }).join('');
-    }
-
-    container.classList.remove('hidden');
-    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function escapeQuotes(str) {
-    if (!str) return '';
-    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-}
-
-async function startScraping() {
-    const query = document.getElementById('queryInput').value.trim();
-    const maxResults = parseInt(document.getElementById('maxResults').value);
-
-    if (!query) {
-        alert("Please enter a valid GitHub search query.");
-        return;
-    }
-
-    const btnScrape = document.getElementById('btnScrape');
-    const progressSection = document.getElementById('progressSection');
-    const resultsSection = document.getElementById('resultsSection');
-    const terminalLog = document.getElementById('terminalLog');
-    const progressBar = document.getElementById('progressBar');
-    const progressPercent = document.getElementById('progressPercent');
-    const spinner = document.getElementById('spinner');
-    const checkIcon = document.getElementById('checkIcon');
-    const progressTitle = document.getElementById('progressTitle');
-
-    btnScrape.disabled = true;
-    btnScrape.style.opacity = '0.6';
-
-    spinner.classList.remove('hidden');
-    checkIcon.classList.add('hidden');
-    progressTitle.innerText = "Scraping Execution Progress";
-
-    progressSection.classList.remove('hidden');
-    resultsSection.classList.add('hidden');
-
-    progressBar.classList.remove('completed');
-    progressPercent.classList.remove('completed');
-    progressBar.style.width = '0%';
-    progressPercent.innerText = '0%';
-    terminalLog.innerHTML = `<div class="log-line text-muted">[System] Initiating scrape task for query: "${query}"...</div>`;
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-    }
-
-    try {
-        const response = await fetch('/api/scrape', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ query: query, max_results: maxResults })
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Failed to start scraping task.");
-        }
-
-        const data = await response.json();
-        currentTaskId = data.task_id;
+        currentCampaignId = data.campaign_id;
         
-        pollInterval = setInterval(checkStatus, 1000);
-
+        pollInterval = setInterval(checkCampaignStatus, 2000);
     } catch (err) {
-        alert("Error starting scraper: " + err.message);
-        btnScrape.disabled = false;
-        btnScrape.style.opacity = '1';
-        progressSection.classList.add('hidden');
+        alert("Error: " + err.message);
+        btnLaunch.disabled = false;
+        btnLaunch.style.opacity = '1';
     }
 }
 
-async function checkStatus() {
-    if (!currentTaskId) return;
+async function checkCampaignStatus() {
+    if (!currentCampaignId) return;
 
     try {
-        const response = await fetch(`/api/status/${currentTaskId}`);
+        const response = await fetch(`/api/sdr/campaigns/status/${currentCampaignId}`);
         if (!response.ok) return;
 
         const data = await response.json();
+        currentLeadsData = data.leads || [];
 
         const progressBar = document.getElementById('progressBar');
         const progressPercent = document.getElementById('progressPercent');
         const terminalLog = document.getElementById('terminalLog');
+        const progressTitle = document.getElementById('progressTitle');
 
-        progressBar.style.width = `${data.progress}%`;
-        progressPercent.innerText = `${data.progress}%`;
-
-        if (data.logs && data.logs.length > 0) {
-            terminalLog.innerHTML = data.logs.map(log => `<div class="log-line">> ${log}</div>`).join('');
-            terminalLog.scrollTop = terminalLog.scrollHeight;
+        let pct = 0;
+        if (data.total_expected > 0) {
+            pct = Math.min(100, Math.floor((data.progress / data.total_expected) * 100));
         }
 
-        if (data.status === 'completed') {
+        progressBar.style.width = `${pct}%`;
+        progressPercent.innerText = `${pct}%`;
+
+        terminalLog.innerHTML = `<div>> Status: ${data.status} | Qualified: ${data.progress} / ${data.total_expected} prospects</div>`;
+
+        if (data.status === 'RUNNING') {
+            progressTitle.innerText = "Crawling & AI Scoring eQMS Prospects...";
+            renderLeadsList(currentLeadsData);
+        } else if (data.status === 'COMPLETED') {
             clearInterval(pollInterval);
-            finishScraping(data);
-        } else if (data.status === 'failed') {
+            progressTitle.innerText = "Scan Completed & Qualified";
+            progressBar.style.width = '100%';
+            progressPercent.innerText = '100%';
+            resetUI();
+            renderLeadsList(currentLeadsData);
+        } else if (data.status === 'FAILED') {
             clearInterval(pollInterval);
-            alert("Scraping task failed: " + (data.error || "Unknown error"));
+            alert("Scan failed: " + data.error_message);
             resetUI();
         }
     } catch (err) {
@@ -257,84 +100,121 @@ async function checkStatus() {
     }
 }
 
-function finishScraping(data) {
-    const btnScrape = document.getElementById('btnScrape');
-    const resultsSection = document.getElementById('resultsSection');
-    const tableBody = document.getElementById('tableBody');
-    const summaryStats = document.getElementById('summaryStats');
+function resetUI() {
+    const btnLaunch = document.getElementById('btnLaunch');
+    btnLaunch.disabled = false;
+    btnLaunch.style.opacity = '1';
+}
 
-    const spinner = document.getElementById('spinner');
-    const checkIcon = document.getElementById('checkIcon');
-    const progressTitle = document.getElementById('progressTitle');
-    const progressBar = document.getElementById('progressBar');
-    const progressPercent = document.getElementById('progressPercent');
+function renderLeadsList(leads) {
+    const leadsList = document.getElementById('leadsList');
+    const summarySubtitle = document.getElementById('summarySubtitle');
 
-    spinner.classList.add('hidden');
-    checkIcon.classList.remove('hidden');
-    progressTitle.innerText = "Scraping Task Completed";
-    
-    progressBar.style.width = '100%';
-    progressPercent.innerText = '✓ 100%';
-    progressBar.classList.add('completed');
-    progressPercent.classList.add('completed');
-
-    btnScrape.disabled = false;
-    btnScrape.style.opacity = '1';
-
-    resultsSection.classList.remove('hidden');
-
-    const results = data.results || [];
-    const emailsCount = results.filter(r => r.Email && r.Email !== 'N/A').length;
-    const linkedinCount = results.filter(r => r["LinkedIn URL"] && r["LinkedIn URL"] !== 'N/A').length;
-
-    summaryStats.innerText = `Gathered ${results.length} profile(s) | Emails: ${emailsCount} | LinkedIn: ${linkedinCount}`;
-
-    if (results.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No profile results found for query. Try modifying your search parameters or preset tags.</td></tr>`;
+    if (!leads || leads.length === 0) {
+        leadsList.innerHTML = `
+            <div class="card" style="text-align:center; padding:3rem; color:var(--text-muted);">
+                <p>Scanning FDA registrations and web text for target prospects...</p>
+            </div>
+        `;
         return;
     }
 
-    tableBody.innerHTML = results.map((row, idx) => {
-        const name = row.Name || 'N/A';
-        const emailHtml = (row.Email && row.Email !== 'N/A') 
-            ? `<span class="badge-email">${row.Email}</span>` 
-            : `<span class="badge-na">N/A</span>`;
+    summarySubtitle.innerText = `Found ${leads.length} qualified Life Science prospects. Sorted by QMS Fit Score.`;
 
-        const linkedinHtml = (row["LinkedIn URL"] && row["LinkedIn URL"] !== 'N/A') 
-            ? `<a href="${row["LinkedIn URL"]}" target="_blank" class="badge-linkedin">View Profile ↗</a>` 
-            : `<span class="badge-na">N/A</span>`;
+    leadsList.innerHTML = leads.map(lead => {
+        const fitScore = lead.qms_fit_score || 70;
+        const scoreClass = fitScore >= 80 ? 'score-high' : 'score-med';
+        const drivers = lead.compliance_drivers || [];
 
-        const githubHtml = `<a href="${row["GitHub URL"]}" target="_blank" class="link-github">${row["GitHub URL"]}</a>`;
-        const repos = row.Repositories || '0';
+        const contactsHtml = (lead.contacts || []).map(contact => `
+            <div class="contact-card">
+                <div class="contact-info">
+                    <h4>${contact.name}</h4>
+                    <p>${contact.title}</p>
+                    <div class="email-row">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        ${contact.email}
+                        <span style="font-size:0.675rem; background:rgba(16, 185, 129, 0.2); color:#34d399; padding:0.1rem 0.4rem; border-radius:4px;">${contact.verification_status}</span>
+                    </div>
+                </div>
+                <button class="btn-view-seq" onclick="openSequenceModal(${lead.id}, ${contact.id})">
+                    View AI Email Sequence →
+                </button>
+            </div>
+        `).join('');
 
         return `
-            <tr>
-                <td>${idx + 1}</td>
-                <td><strong>${name}</strong></td>
-                <td>${emailHtml}</td>
-                <td>${linkedinHtml}</td>
-                <td>${githubHtml}</td>
-                <td>${repos}</td>
-            </tr>
+            <div class="lead-card">
+                <div class="lead-top">
+                    <div>
+                        <div class="company-name">
+                            ${lead.name}
+                            <a href="${lead.website_url}" target="_blank" style="font-size:0.8rem; color:var(--text-secondary); text-decoration:none;">↗</a>
+                        </div>
+                        <div class="lead-meta">
+                            <span class="meta-item">📍 ${lead.region}</span>
+                            <span class="meta-item">🏷️ ${lead.industry_subsector}</span>
+                            <span class="meta-item">👥 ${lead.employee_range}</span>
+                            <span class="meta-item" style="color:var(--accent-fuchsia);">🔍 ${lead.source}</span>
+                        </div>
+                    </div>
+                    <div class="score-pill ${scoreClass}">
+                        QMS FIT: ${fitScore}/100
+                    </div>
+                </div>
+
+                <div class="driver-tags">
+                    ${drivers.map(d => `<span class="driver-badge">${d}</span>`).join('')}
+                </div>
+
+                <div class="summary-box">
+                    ${lead.summary}
+                </div>
+
+                <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem; uppercase;">Decision Maker Contacts:</div>
+                <div class="contacts-grid">
+                    ${contactsHtml}
+                </div>
+            </div>
         `;
     }).join('');
 }
 
-function resetUI() {
-    const btnScrape = document.getElementById('btnScrape');
-    const spinner = document.getElementById('spinner');
-    const checkIcon = document.getElementById('checkIcon');
+function openSequenceModal(leadId, contactId) {
+    const lead = currentLeadsData.find(l => l.id === leadId);
+    if (!lead) return;
+    const contact = (lead.contacts || []).find(c => c.id === contactId);
+    if (!contact) return;
 
-    btnScrape.disabled = false;
-    btnScrape.style.opacity = '1';
-    spinner.classList.add('hidden');
-    checkIcon.classList.add('hidden');
+    document.getElementById('modalContactName').innerText = `${contact.name} - ${lead.name}`;
+    document.getElementById('modalContactTitle').innerText = `${contact.title} | ${contact.email}`;
+
+    const seqs = contact.sequences || [];
+    const seqContent = document.getElementById('modalSequenceContent');
+
+    if (seqs.length === 0) {
+        seqContent.innerHTML = `<p style="color:var(--text-muted);">No sequence generated.</p>`;
+    } else {
+        seqContent.innerHTML = seqs.map(s => `
+            <div class="seq-step">
+                <div class="seq-step-title">Step ${s.step_number} Email Sequence</div>
+                <div class="seq-subject">Subject: ${s.subject}</div>
+                <div class="seq-body">${s.body_text}</div>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('sequenceModal').classList.remove('hidden');
 }
 
-function downloadFile(fileFormat) {
-    if (!currentTaskId) {
-        alert("No active or completed scrape task found.");
+function closeModal() {
+    document.getElementById('sequenceModal').classList.add('hidden');
+}
+
+function exportData(format) {
+    if (!currentCampaignId) {
+        alert("Please run an AI SDR campaign first.");
         return;
     }
-    window.location.href = `/api/download/${currentTaskId}/${fileFormat}`;
+    window.location.href = `/api/sdr/export/${currentCampaignId}/${format}`;
 }

@@ -1,39 +1,149 @@
 import os
-os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '0'
-import json
 import uuid
-import hashlib
-import threading
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+import json
+import asyncio
 import pandas as pd
-import jwt
-from dotenv import load_dotenv
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends, Header
-from fastapi.responses import FileResponse, HTMLResponse
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, Depends, Request, status
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
-from groq import Groq
 from sqlalchemy.orm import Session
 
-from scraper import GitHubScraper
-from database import init_db, get_db, SessionLocal, User, UserQuery, ScrapedResult
+from database import (
+    init_db, get_db, SessionLocal, User, UserQuery, 
+    SdrCampaign, CompanyLead, QualifiedContact, OutreachSequence
+)
+from discovery import LeadDiscoveryEngine
+from crawler import DomainCrawler
+from ai_classifier import AIProspectClassifier
+from enrichment import PersonaContactEnricher
+from outreach_generator import OutreachCopyGenerator
 
-# Load environment variables
-load_dotenv()
-
-# Initialize Database tables
+# Ensure DB initialized
 init_db()
 
-app = FastAPI(title="GitHub Data Scraper API with Auth & Database")
+# Instantiate modules
+discovery_engine = LeadDiscoveryEngine()
+domain_crawler = DomainCrawler()
+ai_classifier = AIProspectClassifier()
+contact_enricher = PersonaContactEnricher()
+copy_generator = OutreachCopyGenerator()
 
-# Auth & Security setup
-JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_jwt_key_2026")
-JWT_ALGORITHM = "HS256"
-security = HTTPBearer(auto_error=False)
+async def background_sdr_worker():
+    """Indefinite background worker processing AI SDR Lead Scraper Campaigns."""
+    while True:
+        try:
+            with SessionLocal() as db:
+                campaign = db.query(SdrCampaign).filter(SdrCampaign.status == "PENDING").first()
+                if campaign:
+                    campaign.status = "RUNNING"
+                    db.commit()
+                    campaign_id = campaign.id
+                    
+                    try:
+                        # 1. Discover Leads across FDA Registrations, Clinical Trials & Associations
+                        raw_leads = await discovery_engine.discover_leads(
+                            target_region=campaign.target_region,
+                            target_sector=campaign.target_sector,
+                            max_results=campaign.total_expected
+                        )
+                        
+                        processed_count = 0
+                        for lead_item in raw_leads:
+                            # 2. Crawl Company Domain for QMS keywords
+                            crawl_data = await domain_crawler.crawl_domain(
+                                domain=lead_item["domain"],
+                                base_url=lead_item.get("website_url")
+                            )
+                            
+                            # 3. AI Qualification & QMS Fit Scoring
+                            ai_qual = await ai_classifier.qualify_lead(lead_item, crawl_data)
+                            
+                            # Save Company Lead
+                            company_lead = CompanyLead(
+                                campaign_id=campaign_id,
+                                domain=lead_item["domain"],
+                                name=lead_item["name"],
+                                region=lead_item.get("region", campaign.target_region),
+                                industry_subsector=lead_item.get("industry_subsector", campaign.target_sector),
+                                employee_range=lead_item.get("employee_range", "50-200"),
+                                qms_fit_score=ai_qual["qms_fit_score"],
+                                compliance_drivers=json.dumps(ai_qual["compliance_drivers"]),
+                                summary=ai_qual["summary"],
+                                website_url=lead_item.get("website_url"),
+                                source=lead_item.get("source", "Regulatory Scanner")
+                            )
+                            db.add(company_lead)
+                            db.flush() # get company_lead.id
+                            
+                            # 4. Enrich Decision Maker Contacts
+                            enriched_contacts = contact_enricher.enrich_contacts_for_lead(
+                                domain=lead_item["domain"],
+                                company_name=lead_item["name"],
+                                crawl_emails=crawl_data.get("emails_found")
+                            )
+                            
+                            for c_data in enriched_contacts:
+                                contact_obj = QualifiedContact(
+                                    company_id=company_lead.id,
+                                    name=c_data["name"],
+                                    title=c_data["title"],
+                                    email=c_data["email"],
+                                    linkedin_url=c_data["linkedin_url"],
+                                    verification_status=c_data["verification_status"]
+                                )
+                                db.add(contact_obj)
+                                db.flush() # get contact_obj.id
+                                
+                                # 5. Generate AI SDR Cold Outreach Copy
+                                company_dict = {
+                                    "name": company_lead.name,
+                                    "industry_subsector": company_lead.industry_subsector,
+                                    "region": company_lead.region,
+                                    "compliance_drivers": ai_qual["compliance_drivers"]
+                                }
+                                sequences = await copy_generator.generate_sequences(c_data, company_dict)
+                                
+                                for seq in sequences:
+                                    outreach = OutreachSequence(
+                                        contact_id=contact_obj.id,
+                                        step_number=seq.get("step_number", 1),
+                                        subject=seq.get("subject", "QMS Software Inquiry"),
+                                        body_text=seq.get("body_text", ""),
+                                        personalized_hook=seq.get("personalized_hook", "")
+                                    )
+                                    db.add(outreach)
+                            
+                            processed_count += 1
+                            campaign.progress = processed_count
+                            db.commit()
+                            
+                        campaign.status = "COMPLETED"
+                        db.commit()
+                    except Exception as e:
+                        print(f"Campaign execution error: {e}")
+                        campaign.status = "FAILED"
+                        campaign.error_message = str(e)
+                        db.commit()
+        except Exception as e:
+            print(f"Background SDR worker loop notice: {e}")
+            
+        await asyncio.sleep(3)
 
-# Directories setup
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    worker_task = asyncio.create_task(background_sdr_worker())
+    yield
+    worker_task.cancel()
+
+app = FastAPI(title="AI SDR & eQMS B2B Lead Generator System", lifespan=lifespan)
+
+# Static files setup
 OUTPUTS_DIR = os.path.join(os.path.dirname(__file__), "outputs")
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
@@ -41,422 +151,133 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# In-memory task tracking
-tasks_db: Dict[str, Dict[str, Any]] = {}
-
-# Pydantic Schemas
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-class ScrapeRequest(BaseModel):
-    query: str
-    max_results: int = 10
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-class AiQueryRequest(BaseModel):
-    prompt: str
-    history: Optional[List[ChatMessage]] = []
-
-# Auth Helper Functions using PBKDF2 sha256
-def hash_password(password: str) -> str:
-    salt = os.urandom(16)
-    pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
-    return salt.hex() + ':' + pwd_hash.hex()
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    try:
-        salt_hex, hash_hex = hashed_password.split(':')
-        salt = bytes.fromhex(salt_hex)
-        pwd_hash = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, 100000)
-        return pwd_hash.hex() == hash_hex
-    except Exception:
-        return False
-
-def create_access_token(user_id: int, email: str) -> str:
-    payload = {
-        "sub": str(user_id),
-        "email": email,
-        "exp": datetime.utcnow() + timedelta(days=7)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def get_current_user_optional(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
-    if not credentials:
-        return None
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = int(payload.get("sub"))
-        return db.query(User).filter(User.id == user_id).first()
-    except Exception:
-        return None
-
-def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
-) -> User:
-    user = get_current_user_optional(credentials, db)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-    return user
-
-def get_groq_client() -> Groq:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY is not set in environment variables.")
-    return Groq(api_key=api_key)
-
-def run_scraper_task(task_id: str, query: str, max_results: int, user_id: Optional[int] = None):
-    tasks_db[task_id]["status"] = "running"
-    tasks_db[task_id]["progress"] = 5
-    tasks_db[task_id]["logs"].append(f"Task started for query: '{query}'")
-
-    def progress_cb(pct: int, msg: str):
-        tasks_db[task_id]["progress"] = pct
-        tasks_db[task_id]["logs"].append(msg)
-
-    try:
-        scraper = GitHubScraper(headless=True)
-        results = scraper.scrape(query, max_results=max_results, progress_callback=progress_cb)
-
-        tasks_db[task_id]["results"] = results
-        
-        # Save output files locally
-        if results:
-            df = pd.DataFrame(results)
-            desired_columns = ["Name", "Email", "LinkedIn URL", "GitHub URL", "Repositories"]
-            df = df.reindex(columns=desired_columns)
-
-            csv_path = os.path.join(OUTPUTS_DIR, f"{task_id}.csv")
-            excel_path = os.path.join(OUTPUTS_DIR, f"{task_id}.xlsx")
-
-            df.to_csv(csv_path, index=False)
-            df.to_excel(excel_path, index=False, engine='openpyxl')
-
-            tasks_db[task_id]["csv_file"] = csv_path
-            tasks_db[task_id]["excel_file"] = excel_path
-
-        # Save to Database if user_id is provided
-        if user_id:
-            db = SessionLocal()
-            try:
-                # 1. Save query history
-                new_query_record = UserQuery(user_id=user_id, query=query, max_results=max_results)
-                db.add(new_query_record)
-
-                # Maintain max 20 query records per user
-                user_queries_count = db.query(UserQuery).filter(UserQuery.user_id == user_id).count()
-                if user_queries_count > 20:
-                    oldest_queries = (
-                        db.query(UserQuery)
-                        .filter(UserQuery.user_id == user_id)
-                        .order_by(UserQuery.created_at.asc())
-                        .limit(user_queries_count - 20)
-                        .all()
-                    )
-                    for oq in oldest_queries:
-                        db.delete(oq)
-
-                # 2. Save extracted profiles to database
-                for r in results:
-                    db_result = ScrapedResult(
-                        user_id=user_id,
-                        query=query,
-                        github_url=r.get("GitHub URL", ""),
-                        name=r.get("Name"),
-                        email=r.get("Email"),
-                        linkedin_url=r.get("LinkedIn URL"),
-                        repositories=str(r.get("Repositories", "0"))
-                    )
-                    db.add(db_result)
-
-                db.commit()
-            except Exception as db_err:
-                print(f"[-] Database save error: {db_err}")
-                db.rollback()
-            finally:
-                db.close()
-
-        tasks_db[task_id]["status"] = "completed"
-        tasks_db[task_id]["progress"] = 100
-        tasks_db[task_id]["logs"].append("Scraping completed successfully.")
-
-    except Exception as e:
-        tasks_db[task_id]["status"] = "failed"
-        tasks_db[task_id]["error"] = str(e)
-        tasks_db[task_id]["logs"].append(f"Error occurred: {str(e)}")
-
-# Routes
+# Schemas
+class StartCampaignRequest(BaseModel):
+    target_region: str = "Massachusetts, USA"
+    target_sector: str = "Medical Devices / MedTech"
+    max_results: int = 5
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_file):
         with open(index_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>GitHub Data Scraper API is running.</h1>")
+            return f.read()
+    return "<h1>AI SDR eQMS Lead Generator API is running!</h1>"
 
-@app.get("/login", response_class=HTMLResponse)
-def read_login():
-    login_file = os.path.join(STATIC_DIR, "login.html")
-    if os.path.exists(login_file):
-        with open(login_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>Login Page</h1>")
-
-@app.get("/signup", response_class=HTMLResponse)
-def read_signup():
-    signup_file = os.path.join(STATIC_DIR, "signup.html")
-    if os.path.exists(signup_file):
-        with open(signup_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>Signup Page</h1>")
-
-@app.get("/history", response_class=HTMLResponse)
-def read_history():
-    history_file = os.path.join(STATIC_DIR, "history.html")
-    if os.path.exists(history_file):
-        with open(history_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>History Page</h1>")
-
-@app.get("/saved-data", response_class=HTMLResponse)
-def read_saved_data():
-    saved_file = os.path.join(STATIC_DIR, "saved-data.html")
-    if os.path.exists(saved_file):
-        with open(saved_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>Saved Data Page</h1>")
-
-# Authentication Endpoints
-@app.post("/api/auth/register")
-def register_user(req: RegisterRequest, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == req.email.lower()).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User with this email already exists.")
-    
-    if len(req.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
-
-    new_user = User(email=req.email.lower(), hashed_password=hash_password(req.password))
-    db.add(new_user)
+@app.post("/api/sdr/campaigns/start")
+def start_campaign(req: StartCampaignRequest, db: Session = Depends(get_db)):
+    campaign_id = str(uuid.uuid4())
+    campaign = SdrCampaign(
+        id=campaign_id,
+        target_region=req.target_region,
+        target_sector=req.target_sector,
+        status="PENDING",
+        progress=0,
+        total_expected=req.max_results
+    )
+    db.add(campaign)
     db.commit()
-    db.refresh(new_user)
+    return {"campaign_id": campaign_id, "status": "PENDING"}
 
-    token = create_access_token(new_user.id, new_user.email)
-    return {"token": token, "email": new_user.email}
+@app.get("/api/sdr/campaigns/status/{campaign_id}")
+def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
+    campaign = db.query(SdrCampaign).filter(SdrCampaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+        
+    leads = db.query(CompanyLead).filter(CompanyLead.campaign_id == campaign_id).order_by(CompanyLead.qms_fit_score.desc()).all()
+    
+    lead_results = []
+    for lead in leads:
+        contacts_data = []
+        for contact in lead.contacts:
+            seqs_data = [
+                {
+                    "step_number": s.step_number,
+                    "subject": s.subject,
+                    "body_text": s.body_text,
+                    "personalized_hook": s.personalized_hook
+                } for s in contact.sequences
+            ]
+            contacts_data.append({
+                "id": contact.id,
+                "name": contact.name,
+                "title": contact.title,
+                "email": contact.email,
+                "linkedin_url": contact.linkedin_url,
+                "verification_status": contact.verification_status,
+                "sequences": seqs_data
+            })
+            
+        lead_results.append({
+            "id": lead.id,
+            "name": lead.name,
+            "domain": lead.domain,
+            "region": lead.region,
+            "industry_subsector": lead.industry_subsector,
+            "employee_range": lead.employee_range,
+            "qms_fit_score": lead.qms_fit_score,
+            "compliance_drivers": json.loads(lead.compliance_drivers) if lead.compliance_drivers else [],
+            "summary": lead.summary,
+            "website_url": lead.website_url,
+            "source": lead.source,
+            "contacts": contacts_data
+        })
 
-@app.post("/api/auth/login")
-def login_user(req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email.lower()).first()
-    if not user or not verify_password(req.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
-
-    token = create_access_token(user.id, user.email)
-    return {"token": token, "email": user.email}
-
-@app.get("/api/auth/me")
-def get_me(user: User = Depends(get_current_user)):
-    return {"id": user.id, "email": user.email, "created_at": user.created_at}
-
-# User History & Saved Results Endpoints
-@app.get("/api/user/history")
-def get_user_history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    queries = (
-        db.query(UserQuery)
-        .filter(UserQuery.user_id == user.id)
-        .order_by(UserQuery.created_at.desc())
-        .limit(20)
-        .all()
-    )
-    return [
-        {
-            "id": q.id,
-            "query": q.query,
-            "max_results": q.max_results,
-            "created_at": q.created_at.strftime("%Y-%m-%d %H:%M")
-        }
-        for q in queries
-    ]
-
-@app.get("/api/user/saved-results")
-def get_saved_results(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    results = (
-        db.query(ScrapedResult)
-        .filter(ScrapedResult.user_id == user.id)
-        .order_by(ScrapedResult.created_at.desc())
-        .all()
-    )
-    return [
-        {
-            "id": r.id,
-            "query": r.query,
-            "name": r.name,
-            "email": r.email,
-            "linkedin_url": r.linkedin_url,
-            "github_url": r.github_url,
-            "repositories": r.repositories,
-            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M")
-        }
-        for r in results
-    ]
-
-# AI & Scraper Endpoints
-@app.post("/api/generate-query")
-def generate_ai_query(req: AiQueryRequest):
-    if not req.prompt.strip():
-        raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
-
-    client = get_groq_client()
-    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
-
-    system_prompt = (
-        "You are an expert AI Assistant and GitHub Search Syntax Architect. Your goal is to analyze the user's request, "
-        "explain your technical reasoning, and generate exactly 3 distinct, valid GitHub user search query options.\n\n"
-        "STRICT GITHUB SYNTAX RULES (NO HALLUCINATIONS):\n"
-        "1. Always include `type:user` in every query string.\n"
-        "2. Location parameter must be formatted as `location:<city_or_country>` (e.g. location:India, location:London, location:\"San Francisco\"). NEVER omit the colon.\n"
-        "3. Language parameter must be formatted as `language:<programming_language>` (e.g. language:Python, language:TypeScript). NEVER omit the colon.\n"
-        "4. Repositories parameter must be `repos:><number>` (e.g. repos:>10). NEVER omit the colon.\n"
-        "5. Keyword qualifiers: Place keywords like `student`, `fullstack`, `developer` directly or with `in:bio` (e.g., `student location:India language:Python repos:>10 type:user`).\n"
-        "6. If the user asks to modify or refine a previous query from history, adjust the parameters accordingly while preserving intact constraints.\n\n"
-        "REQUIRED OUTPUT FORMAT:\n"
-        "Return STRICT JSON ONLY matching this exact structure (no markdown formatting outside JSON):\n"
-        "{\n"
-        '  "reasoning": "Detailed technical explanation of how you parsed user intent and constructed the query options.",\n'
-        '  "queries": [\n'
-        '    {\n'
-        '      "title": "Strict Query (Exact Match)",\n'
-        '      "description": "Combines all exact parameters specified in the request.",\n'
-        '      "query": "student location:India language:Python repos:>10 type:user"\n'
-        '    },\n'
-        '    {\n'
-        '      "title": "Broad Query (High Velocity)",\n'
-        '      "description": "Widens search range for broader candidate discovery.",\n'
-        '      "query": "location:India language:Python repos:>10 type:user"\n'
-        '    },\n'
-        '    {\n'
-        '      "title": "Bio-Targeted Query (Keyword Focused)",\n'
-        '      "description": "Searches bio text for specific student/role keywords.",\n'
-        '      "query": "student in:bio location:India language:Python type:user"\n'
-        '    }\n'
-        '  ]\n'
-        "}"
-    )
-
-    messages = [{"role": "system", "content": system_prompt}]
-    if req.history:
-        for msg in req.history[-6:]:
-            messages.append({"role": msg.role, "content": msg.content})
-    messages.append({"role": "user", "content": req.prompt})
-
-    try:
-        completion = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0.2,
-            max_tokens=600,
-            response_format={"type": "json_object"}
-        )
-        content_str = completion.choices[0].message.content.strip()
-        data = json.loads(content_str)
-        return {
-            "reasoning": data.get("reasoning", "Parsed request successfully."),
-            "queries": data.get("queries", []),
-            "model_used": model
-        }
-    except Exception as e:
-        try:
-            fallback_model = "llama-3.3-70b-versatile"
-            completion = client.chat.completions.create(
-                model=fallback_model,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=600,
-                response_format={"type": "json_object"}
-            )
-            content_str = completion.choices[0].message.content.strip()
-            data = json.loads(content_str)
-            return {
-                "reasoning": data.get("reasoning", "Parsed request successfully."),
-                "queries": data.get("queries", []),
-                "model_used": fallback_model
-            }
-        except Exception as fallback_err:
-            raise HTTPException(status_code=500, detail=f"AI Agent Error: {str(e)}")
-
-@app.post("/api/scrape")
-def start_scrape(
-    req: ScrapeRequest, 
-    current_user: Optional[User] = Depends(get_current_user_optional)
-):
-    if not req.query.strip():
-        raise HTTPException(status_code=400, detail="Search query cannot be empty.")
-
-    task_id = str(uuid.uuid4())
-    user_id = current_user.id if current_user else None
-
-    tasks_db[task_id] = {
-        "task_id": task_id,
-        "query": req.query,
-        "max_results": req.max_results,
-        "status": "pending",
-        "progress": 0,
-        "logs": [],
-        "results": [],
-        "csv_file": None,
-        "excel_file": None,
-        "error": None
+    return {
+        "campaign_id": campaign.id,
+        "target_region": campaign.target_region,
+        "target_sector": campaign.target_sector,
+        "status": campaign.status,
+        "progress": campaign.progress,
+        "total_expected": campaign.total_expected,
+        "error_message": campaign.error_message,
+        "leads": lead_results
     }
 
-    thread = threading.Thread(
-        target=run_scraper_task, 
-        args=(task_id, req.query, req.max_results, user_id)
-    )
-    thread.daemon = True
-    thread.start()
+@app.get("/api/sdr/export/{campaign_id}/{file_format}")
+def export_leads(campaign_id: str, file_format: str, db: Session = Depends(get_db)):
+    campaign = db.query(SdrCampaign).filter(SdrCampaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+        
+    leads = db.query(CompanyLead).filter(CompanyLead.campaign_id == campaign_id).all()
+    if not leads:
+        raise HTTPException(status_code=404, detail="No leads found for export.")
 
-    return {"task_id": task_id, "status": "pending"}
+    rows = []
+    for lead in leads:
+        drivers = ", ".join(json.loads(lead.compliance_drivers)) if lead.compliance_drivers else ""
+        for contact in lead.contacts:
+            step1 = next((s for s in contact.sequences if s.step_number == 1), None)
+            rows.append({
+                "Company Name": lead.name,
+                "Domain": lead.domain,
+                "Region": lead.region,
+                "Sub-sector": lead.industry_subsector,
+                "QMS Fit Score": lead.qms_fit_score,
+                "Compliance Drivers": drivers,
+                "Contact Name": contact.name,
+                "Title": contact.title,
+                "Work Email": contact.email,
+                "Email Status": contact.verification_status,
+                "LinkedIn": contact.linkedin_url,
+                "Email Subject": step1.subject if step1 else "",
+                "Personalized Hook": step1.personalized_hook if step1 else "",
+                "Lead Source": lead.source
+            })
 
-@app.get("/api/status/{task_id}")
-def get_status(task_id: str):
-    if task_id not in tasks_db:
-        raise HTTPException(status_code=404, detail="Task not found.")
-    return tasks_db[task_id]
-
-@app.get("/api/download/{task_id}/{file_format}")
-def download_file(task_id: str, file_format: str):
-    if task_id not in tasks_db:
-        raise HTTPException(status_code=404, detail="Task not found.")
+    df = pd.DataFrame(rows)
+    fmt = file_format.lower()
     
-    task = tasks_db[task_id]
-    if task["status"] != "completed":
-        raise HTTPException(status_code=400, detail="Task is not yet completed.")
-
-    file_format = file_format.lower()
-    if file_format == "csv":
-        filepath = task.get("csv_file")
-        filename = f"github_users_{task_id[:8]}.csv"
-        media_type = "text/csv"
-    elif file_format in ["excel", "xlsx"]:
-        filepath = task.get("excel_file")
-        filename = f"github_users_{task_id[:8]}.xlsx"
-        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    else:
-        raise HTTPException(status_code=400, detail="Invalid format. Use 'csv' or 'excel'.")
-
-    if not filepath or not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail="Export file not found.")
-
-    return FileResponse(filepath, filename=filename, media_type=media_type)
+    if fmt == "csv":
+        filepath = os.path.join(OUTPUTS_DIR, f"qms_leads_{campaign_id[:8]}.csv")
+        df.to_csv(filepath, index=False)
+        return FileResponse(filepath, media_type="text/csv", filename=f"life_science_qms_leads_{campaign_id[:8]}.csv")
+    elif fmt in ["excel", "xlsx"]:
+        filepath = os.path.join(OUTPUTS_DIR, f"qms_leads_{campaign_id[:8]}.xlsx")
+        df.to_excel(filepath, index=False)
+        return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"life_science_qms_leads_{campaign_id[:8]}.xlsx")
+    
+    raise HTTPException(status_code=400, detail="Invalid format. Use csv or excel.")

@@ -3,210 +3,619 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub User Scraper & Contact Intelligence</title>
-    <!-- Google Fonts -->
+    <title>AI SDR - Life Science & eQMS B2B Lead Generator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0d14;
+            --bg-card: rgba(18, 24, 38, 0.75);
+            --bg-card-hover: rgba(28, 36, 56, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-primary: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --accent-success: #10b981;
+            --accent-fuchsia: #d946ef;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(217, 70, 239, 0.08) 0%, transparent 45%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-fuchsia));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #ffffff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .badge-live {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--accent-success);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .dot-live {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(10, 13, 20, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .preset-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .tag-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tag-btn:hover {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.875rem 1.5rem;
+            background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+            color: white;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px var(--accent-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--accent-glow);
+        }
+
+        .progress-container {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-bar-bg {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 0.75rem 0;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-fuchsia));
+            transition: width 0.3s ease;
+        }
+
+        .log-terminal {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: var(--accent-success);
+            height: 60px;
+            overflow-y: auto;
+        }
+
+        /* Lead Cards List */
+        .lead-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .actions-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .btn-export {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-export:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .lead-card {
+            background: rgba(15, 20, 32, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            transition: all 0.25 ease;
+        }
+
+        .lead-card:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            transform: translateY(-2px);
+            background: rgba(20, 26, 42, 0.85);
+        }
+
+        .lead-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .company-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .score-pill {
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .score-high {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+
+        .score-med {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }
+
+        .lead-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.825rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .driver-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 1rem;
+        }
+
+        .driver-badge {
+            background: rgba(217, 70, 239, 0.12);
+            border: 1px solid rgba(217, 70, 239, 0.3);
+            color: #f472b6;
+            font-size: 0.725rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .summary-box {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        /* Contacts List */
+        .contacts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .contact-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .contact-info h4 {
+            font-size: 0.925rem;
+            color: white;
+            font-weight: 600;
+        }
+
+        .contact-info p {
+            font-size: 0.775rem;
+            color: var(--text-secondary);
+            margin-top: 0.15rem;
+        }
+
+        .email-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #38bdf8;
+        }
+
+        .btn-view-seq {
+            margin-top: 0.75rem;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.775rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-view-seq:hover {
+            background: rgba(99, 102, 241, 0.3);
+            color: white;
+        }
+
+        /* Modal for AI Outreach Sequences */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .modal-body {
+            background: #111625;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 680px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 1.75rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .seq-step {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .seq-step-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent-fuchsia);
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+        }
+
+        .seq-subject {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .seq-body {
+            font-size: 0.825rem;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body>
-    <div class="background-blobs">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
-    </div>
-
-    <div class="app-container">
-        <!-- Header -->
-        <header class="header-card">
-            <div class="brand">
+    <div class="container">
+        <header>
+            <div class="logo-group">
                 <div class="logo-icon">
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-                    </svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
                 <div>
-                    <h1>GitHub Data Scraper</h1>
-                    <p class="subtitle">Extract Profiles, Emails & LinkedIn URLs with AI Intelligence</p>
+                    <h1>AI SDR - eQMS Lead Generator</h1>
+                    <div class="subtitle">Autonomous Life Science Lead Discovery & Cold Outreach Copilot</div>
                 </div>
             </div>
-
-            <!-- User Auth Nav Container -->
-            <div class="user-nav">
-                <!-- Logged In User Pill (Only view since index is protected) -->
-                <div id="loggedInNav" class="user-profile-bar hidden">
-                    <a href="/history" target="_blank" class="btn-nav-action" style="text-decoration: none;">📜 History (Last 20)</a>
-                    <a href="/saved-data" target="_blank" class="btn-nav-action" style="text-decoration: none;">💾 Saved DB Data</a>
-                    <span id="userEmailBadge" class="user-badge">user@example.com</span>
-                    <button class="btn-logout" onclick="logoutUser()">Logout</button>
-                </div>
+            <div class="badge-live">
+                <div class="dot-live"></div>
+                FDA & Clinical Engine Active
             </div>
         </header>
 
-        <main class="main-content">
-            <!-- AI Search Assistant Panel -->
-            <section class="glass-card ai-card">
-                <div class="card-header">
-                    <div class="flex-align">
-                        <span class="ai-sparkle-icon">✨</span>
-                        <h2>AI Search Agent</h2>
-                    </div>
-                    <div class="flex-align">
-                        <button type="button" id="btnClearMemory" onclick="clearAiMemory()" class="btn-memory hidden" title="Clear Chat History">
-                            <span>🧹 Clear Memory</span>
-                        </button>
-                        <span class="badge badge-ai">Groq gpt-oss-20b</span>
-                    </div>
+        <div class="grid-layout">
+            <!-- Sidebar Setup -->
+            <div class="card">
+                <div class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Campaign Criteria
                 </div>
-                <p class="ai-desc">Describe target developers in plain English. The AI agent will analyze your request, explain its reasoning, and generate 3 query strategies.</p>
-
-                <div class="ai-input-row">
-                    <input 
-                        type="text" 
-                        id="aiPromptInput" 
-                        placeholder="e.g. Find Python developers in India who are students with > 10 repos" 
-                        onkeydown="if(event.key === 'Enter') generateAiQuery();"
-                    />
-                    <button type="button" id="btnAiGenerate" onclick="generateAiQuery()" class="btn-ai">
-                        <span>Generate Strategies ✨</span>
-                    </button>
-                </div>
-
-                <div id="aiResponseContainer" class="ai-response-box hidden">
-                    <div class="ai-reasoning-card">
-                        <div class="reasoning-header">
-                            <span class="bot-icon">🤖</span>
-                            <strong>AI Agent Reasoning & Syntax Analysis:</strong>
-                        </div>
-                        <p id="aiReasoningText" class="reasoning-text"></p>
-                    </div>
-
-                    <div class="queries-title">Generated Search Strategies:</div>
-                    <div id="aiQueriesList" class="queries-grid">
-                        <!-- Dynamic Query Cards -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- Search Query Panel -->
-            <section class="glass-card search-card">
-                <div class="card-header">
-                    <h2>Search Parameters</h2>
-                    <span class="badge">Configurable</span>
-                </div>
-                
-                <form id="scrapeForm" onsubmit="event.preventDefault(); startScraping();">
+                <form id="sdrForm" onsubmit="event.preventDefault(); startSdrCampaign();">
                     <div class="form-group">
-                        <label for="queryInput">GitHub Search Query</label>
-                        <div class="input-wrapper">
-                            <input 
-                                type="text" 
-                                id="queryInput" 
-                                placeholder="e.g. student location:India language:Python repos:>10 type:user"
-                                value="student location:India language:Python repos:>10 type:user"
-                                required
-                            />
-                            <button type="button" class="btn-clear" onclick="document.getElementById('queryInput').value=''">×</button>
+                        <label for="targetRegion">Target Region / State</label>
+                        <input type="text" id="targetRegion" value="Massachusetts, USA" placeholder="e.g. California, USA or Europe">
+                        <div class="preset-tags">
+                            <span class="tag-btn" onclick="setPreset('Massachusetts, USA')">Boston/MA</span>
+                            <span class="tag-btn" onclick="setPreset('California, USA')">California</span>
+                            <span class="tag-btn" onclick="setPreset('New Jersey, USA')">New Jersey</span>
+                            <span class="tag-btn" onclick="setPreset('United Kingdom')">UK</span>
                         </div>
                     </div>
 
-                    <div class="preset-chips">
-                        <span class="preset-label">Sample Presets:</span>
-                        <button type="button" class="chip" onclick="setQuery('student location:India language:Python repos:>10 type:user')">India Python Students</button>
-                        <button type="button" class="chip" onclick="setQuery('location:San Francisco language:TypeScript repos:>20 type:user')">SF TS Devs</button>
-                        <button type="button" class="chip" onclick="setQuery('location:London language:Go type:user')">London Go Devs</button>
+                    <div class="form-group">
+                        <label for="targetSector">Industry Sub-Sector</label>
+                        <select id="targetSector">
+                            <option value="Medical Devices / MedTech" selected>Medical Devices / MedTech</option>
+                            <option value="Biotechnology / Cell Therapy">Biotechnology / Cell Therapy</option>
+                            <option value="Pharmaceuticals">Pharmaceuticals</option>
+                            <option value="In-Vitro Diagnostics (IVD)">In-Vitro Diagnostics (IVD)</option>
+                        </select>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group flex-1">
-                            <label for="maxResults">Max Profiles to Scrape</label>
-                            <select id="maxResults">
-                                <option value="5">5 Profiles (Fast Test)</option>
-                                <option value="10" selected>10 Profiles (Standard)</option>
-                                <option value="20">20 Profiles</option>
-                                <option value="50">50 Profiles</option>
-                            </select>
-                        </div>
-                        <div class="form-group flex-submit">
-                            <button type="submit" id="btnScrape" class="btn-primary">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                <span>Start Scraper</span>
-                            </button>
-                        </div>
+                    <div class="form-group">
+                        <label for="maxProspects">Max Qualified Prospects</label>
+                        <select id="maxProspects">
+                            <option value="5" selected>5 Prospects (Fast Demo)</option>
+                            <option value="10">10 Prospects (Standard)</option>
+                            <option value="25">25 Prospects</option>
+                            <option value="50">50 Prospects (Deep Sweep)</option>
+                        </select>
                     </div>
+
+                    <button type="submit" id="btnLaunch" class="btn-submit">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Launch AI Lead Scanner
+                    </button>
                 </form>
-            </section>
 
-            <!-- Progress & Terminal Log Section -->
-            <section id="progressSection" class="glass-card progress-card hidden">
-                <div class="card-header">
-                    <div class="flex-align">
-                        <div class="spinner" id="spinner"></div>
-                        <span class="check-icon hidden" id="checkIcon">✓</span>
-                        <h3 id="progressTitle">Scraping Execution Progress</h3>
+                <div id="progressSection" class="progress-container hidden">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
+                        <span id="progressTitle" style="color:var(--text-primary); font-weight:600;">Scanning FDA & Web Data...</span>
+                        <span id="progressPercent" style="color:var(--accent-fuchsia); font-weight:700;">0%</span>
                     </div>
-                    <span id="progressPercent" class="percent-badge">0%</span>
-                </div>
-
-                <div class="progress-bar-container">
-                    <div id="progressBar" class="progress-bar" style="width: 0%;"></div>
-                </div>
-
-                <div class="terminal-container">
-                    <div class="terminal-header">
-                        <span class="terminal-title">Live System Logs</span>
-                        <span class="terminal-dots"><span></span><span></span><span></span></span>
+                    <div class="progress-bar-bg">
+                        <div id="progressBar" class="progress-bar-fill"></div>
                     </div>
-                    <div id="terminalLog" class="terminal-log">
-                        <div class="log-line text-muted">[System] Ready for execution request.</div>
+                    <div id="terminalLog" class="log-terminal">
+                        > Initializing AI Lead Scanner...
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Results Data Table Section -->
-            <section id="resultsSection" class="glass-card results-card hidden">
-                <div class="results-header">
+            <!-- Main Results Area -->
+            <div>
+                <div class="lead-header">
                     <div>
-                        <h2>Extracted User Profiles</h2>
-                        <p id="summaryStats" class="results-summary">Found 0 profile records</p>
+                        <h2 style="font-family:'Outfit'; font-size:1.4rem;">Discovered Life Science Prospects</h2>
+                        <p style="font-size:0.85rem; color:var(--text-secondary);" id="summarySubtitle">Ready to scan and qualify targeted SMBs.</p>
                     </div>
-                    <div class="export-actions">
-                        <button id="btnDownloadCsv" onclick="downloadFile('csv')" class="btn-secondary btn-export">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            <span>Download CSV</span>
+                    <div class="actions-group">
+                        <button onclick="exportData('csv')" class="btn-export">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export CSV
                         </button>
-                        <button id="btnDownloadExcel" onclick="downloadFile('excel')" class="btn-success btn-export">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                            <span>Download Excel</span>
+                        <button onclick="exportData('excel')" class="btn-export" style="border-color:rgba(16, 185, 129, 0.4); color:#34d399;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                            Export Excel
                         </button>
                     </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>LinkedIn URL</th>
-                                <th>GitHub Profile</th>
-                                <th>Repos</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <!-- Dynamic Rows -->
-                        </tbody>
-                    </table>
+                <div id="leadsList">
+                    <!-- Dynamic Lead Cards -->
+                    <div class="card" style="text-align:center; padding:3rem; color:var(--text-muted);">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:1rem; opacity:0.5;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <p>No campaign launched yet. Select a target region and click <strong>Launch AI Lead Scanner</strong>.</p>
+                    </div>
                 </div>
-            </section>
-        </main>
+            </div>
+        </div>
     </div>
 
-
-
-
+    <!-- Modal for Sequences -->
+    <div id="sequenceModal" class="modal-overlay hidden">
+        <div class="modal-body">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modalContactName" style="color:white; font-family:'Outfit';">AI Cold Outreach Sequence</h3>
+                    <p id="modalContactTitle" style="font-size:0.8rem; color:var(--text-secondary);"></p>
+                </div>
+                <button onclick="closeModal()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.5rem;">&times;</button>
+            </div>
+            <div id="modalSequenceContent"></div>
+        </div>
+    </div>
 
     <script src="/static/app.js"></script>
 </body>
