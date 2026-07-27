@@ -317,3 +317,170 @@ def export_leads(campaign_id: str, file_format: str, db: Session = Depends(get_d
         return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"life_science_qms_leads_{campaign_id[:8]}.xlsx")
     
     raise HTTPException(status_code=400, detail="Invalid format. Use csv or excel.")
+
+@app.get("/records", response_class=HTMLResponse)
+def read_records_page():
+    records_file = os.path.join(STATIC_DIR, "records.html")
+    if os.path.exists(records_file):
+        with open(records_file, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Records Library HTML not found</h1>"
+
+@app.get("/api/sdr/records")
+def get_all_stored_records(
+    region: Optional[str] = None,
+    sector: Optional[str] = None,
+    source: Optional[str] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    from sqlalchemy import or_
+    query = db.query(CompanyLead)
+    
+    if region and region != "ALL":
+        reg_lower = region.lower()
+        tokens = [region]
+        if "middle east" in reg_lower:
+            tokens.extend(["israel", "uae", "saudi", "jordan", "dubai", "tel aviv", "ras al khaimah", "amman", "riyadh", "petah tikva"])
+        elif "europe" in reg_lower:
+            tokens.extend(["germany", "uk", "switzerland", "france", "italy", "london", "basel", "göttingen", "hamburg", "melsungen", "oxford"])
+        elif "india" in reg_lower:
+            tokens.extend(["india", "hyderabad", "gujarat", "mumbai", "delhi", "noida", "chennai", "vadodara", "telangana", "maharashtra"])
+        elif "north america" in reg_lower or "usa" in reg_lower or "canada" in reg_lower:
+            tokens.extend(["usa", "canada", "ontario", "quebec", "vancouver", "toronto", "montreal", "massachusetts", "boston"])
+        elif "south america" in reg_lower or "brazil" in reg_lower:
+            tokens.extend(["brazil", "argentina", "mexico", "são paulo", "buenos aires", "mexico city"])
+        elif "asia-pacific" in reg_lower or "japan" in reg_lower:
+            tokens.extend(["japan", "singapore", "south korea", "tokyo", "sejong"])
+
+        query = query.filter(or_(*[CompanyLead.region.ilike(f"%{t}%") for t in tokens]))
+
+    if sector and sector != "ALL":
+        query = query.filter(CompanyLead.industry_subsector.ilike(f"%{sector}%"))
+    if source and source != "ALL":
+        query = query.filter(CompanyLead.source.ilike(f"%{source}%"))
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (CompanyLead.name.ilike(search_term)) |
+            (CompanyLead.domain.ilike(search_term)) |
+            (CompanyLead.region.ilike(search_term)) |
+            (CompanyLead.summary.ilike(search_term))
+        )
+        
+    leads = query.order_by(CompanyLead.created_at.desc()).all()
+    
+    lead_results = []
+    seen_domains = set()
+    for lead in leads:
+        if lead.domain in seen_domains:
+            continue
+        seen_domains.add(lead.domain)
+        
+        contacts_data = []
+        for contact in lead.contacts:
+            seqs_data = [
+                {
+                    "step_number": s.step_number,
+                    "subject": s.subject,
+                    "body_text": s.body_text,
+                    "personalized_hook": s.personalized_hook
+                } for s in contact.sequences
+            ]
+            contacts_data.append({
+                "id": contact.id,
+                "name": contact.name,
+                "title": contact.title,
+                "email": contact.email,
+                "linkedin_url": contact.linkedin_url,
+                "verification_status": contact.verification_status,
+                "sequences": seqs_data
+            })
+            
+        lead_results.append({
+            "id": lead.id,
+            "campaign_id": lead.campaign_id,
+            "name": lead.name,
+            "domain": lead.domain,
+            "region": lead.region,
+            "industry_subsector": lead.industry_subsector,
+            "employee_range": lead.employee_range,
+            "qms_fit_score": lead.qms_fit_score,
+            "compliance_drivers": json.loads(lead.compliance_drivers) if lead.compliance_drivers else [],
+            "summary": lead.summary,
+            "website_url": lead.website_url,
+            "source": lead.source,
+            "contacts": contacts_data,
+            "created_at": lead.created_at.isoformat() if lead.created_at else ""
+        })
+
+    return {
+        "total_count": len(lead_results),
+        "leads": lead_results
+    }
+
+@app.get("/api/sdr/records/export/{file_format}")
+def export_all_stored_records(
+    file_format: str,
+    region: Optional[str] = None,
+    sector: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(CompanyLead)
+    if region and region != "ALL":
+        query = query.filter(CompanyLead.region.ilike(f"%{region}%"))
+    if sector and sector != "ALL":
+        query = query.filter(CompanyLead.industry_subsector.ilike(f"%{sector}%"))
+        
+    leads = query.order_by(CompanyLead.created_at.desc()).all()
+    if not leads:
+        raise HTTPException(status_code=404, detail="No stored records found for export.")
+
+    rows = []
+    seen_domains = set()
+    for lead in leads:
+        if lead.domain in seen_domains:
+            continue
+        seen_domains.add(lead.domain)
+
+        drivers = ", ".join(json.loads(lead.compliance_drivers)) if lead.compliance_drivers else ""
+        contacts = lead.contacts or []
+        c1 = contacts[0] if len(contacts) > 0 else None
+        c2 = contacts[1] if len(contacts) > 1 else None
+
+        step1 = next((s for s in c1.sequences if s.step_number == 1), None) if (c1 and c1.sequences) else None
+
+        rows.append({
+            "Company Name": lead.name,
+            "Domain": lead.domain,
+            "Region": lead.region,
+            "Sub-sector": lead.industry_subsector,
+            "QMS Fit Score": lead.qms_fit_score,
+            "Compliance Drivers": drivers,
+            "Primary Contact": c1.name if c1 else "",
+            "Primary Title": c1.title if c1 else "",
+            "Primary Work Email": c1.email if c1 else "",
+            "Primary LinkedIn": c1.linkedin_url if c1 else "",
+            "Secondary Contact": c2.name if c2 else "",
+            "Secondary Title": c2.title if c2 else "",
+            "Secondary Work Email": c2.email if c2 else "",
+            "Secondary LinkedIn": c2.linkedin_url if c2 else "",
+            "Email Subject": step1.subject if step1 else "",
+            "Personalized Hook": step1.personalized_hook if step1 else "",
+            "Lead Source": lead.source,
+            "Saved Date": lead.created_at.strftime("%Y-%m-%d") if lead.created_at else ""
+        })
+
+    df = pd.DataFrame(rows)
+    fmt = file_format.lower()
+    
+    if fmt == "csv":
+        filepath = os.path.join(OUTPUTS_DIR, "all_stored_life_science_records.csv")
+        df.to_csv(filepath, index=False)
+        return FileResponse(filepath, media_type="text/csv", filename="all_stored_life_science_records.csv")
+    elif fmt in ["excel", "xlsx"]:
+        filepath = os.path.join(OUTPUTS_DIR, "all_stored_life_science_records.xlsx")
+        df.to_excel(filepath, index=False)
+        return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="all_stored_life_science_records.xlsx")
+    
+    raise HTTPException(status_code=400, detail="Invalid format. Use csv or excel.")
