@@ -157,18 +157,30 @@ class LeadDiscoveryEngine:
         try:
             country_code = ""
             reg_lower = region.lower()
-            if "israel" in reg_lower or "middle east" in reg_lower:
+            if "india" in reg_lower:
+                country_code = "IN"
+            elif "israel" in reg_lower or "middle east" in reg_lower:
                 country_code = "IL"
-            elif "germany" in reg_lower or "europe" in reg_lower:
+            elif "germany" in reg_lower:
                 country_code = "DE"
-            elif "japan" in reg_lower:
-                country_code = "JP"
             elif "uk" in reg_lower or "united kingdom" in reg_lower:
                 country_code = "GB"
+            elif "japan" in reg_lower:
+                country_code = "JP"
+            elif "canada" in reg_lower:
+                country_code = "CA"
+            elif "brazil" in reg_lower:
+                country_code = "BR"
+            elif "switzerland" in reg_lower:
+                country_code = "CH"
+            elif "france" in reg_lower:
+                country_code = "FR"
+            elif "italy" in reg_lower:
+                country_code = "IT"
 
             url = f"https://api.fda.gov/device/registrationlisting.json?limit={limit * 4}"
             if country_code:
-                url = f"https://api.fda.gov/device/registrationlisting.json?search=iso_country_code:%22{country_code}%22&limit={limit * 4}"
+                url = f"https://api.fda.gov/device/registrationlisting.json?search=registration.iso_country_code:{country_code}&limit={limit * 4}"
 
             async with httpx.AsyncClient(headers=self.headers, timeout=15.0) as client:
                 resp = await client.get(url)
