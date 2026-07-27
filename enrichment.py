@@ -23,7 +23,7 @@ class QuickLeadLinkedInResolver:
         self.base_url = "https://api.quicklead.io/v1/linkedin/find"
 
     def resolve_linkedin_profile(self, full_name: str, company_name: str, title: str) -> str:
-        """Resolves exact LinkedIn profile URL using QuickLead API or reliable live LinkedIn People Search URL (0% 404 errors)."""
+        """Resolves exact LinkedIn profile URL using QuickLead API or clean concise LinkedIn People Search query."""
         # 1. QuickLead API integration if API key exists
         if self.api_key:
             try:
@@ -35,8 +35,23 @@ class QuickLeadLinkedInResolver:
             except Exception as e:
                 print(f"[QuickLead API Notice] {e}")
 
-        # 2. Reliable 100% working LinkedIn People Search URL (No 404 errors)
-        query = urllib.parse.quote_plus(f"{full_name} {company_name} {title}")
+        # 2. Clean company name: remove legal/facility boilerplate e.g. "Pvt.", "Ltd.", "Inc.", "Facilities"
+        company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', company_name)
+        company_clean = re.sub(r'[^a-zA-Z0-9\s]', '', company_clean).strip()
+        company_keyword = company_clean.split()[0] if company_clean else company_name.split()[0]
+
+        # 3. Clean role keyword: e.g. "Quality Assurance", "Regulatory Affairs", "CEO"
+        if "quality" in title.lower():
+            role_kw = "Quality Assurance"
+        elif "regulatory" in title.lower():
+            role_kw = "Regulatory Affairs"
+        elif "executive" in title.lower() or "ceo" in title.lower():
+            role_kw = "CEO"
+        else:
+            role_kw = title.split()[0]
+
+        # Concise 3-word search query (e.g. "Sarah Miller Myvision Regulatory Affairs")
+        query = urllib.parse.quote_plus(f"{full_name} {company_keyword} {role_kw}")
         return f"https://www.linkedin.com/search/results/people/?keywords={query}"
 
 
