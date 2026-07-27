@@ -16,39 +16,29 @@ DB_SCHEMA = os.getenv("DB_SCHEMA", "ai_sdr")
 if DATABASE_URL.startswith("postgresql+asyncpg://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
-is_postgres = DATABASE_URL.startswith("postgresql")
+# Ensure PostgreSQL schema exists before creating tables
+try:
+    raw_dsn = re.sub(r'^postgresql\+?[^:]*://', 'postgresql://', DATABASE_URL)
+    conn = psycopg2.connect(raw_dsn, connect_timeout=5)
+    cur = conn.cursor()
+    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB_SCHEMA};")
+    conn.commit()
+    cur.close()
+    conn.close()
+    print(f"[Database] Connected to remote PostgreSQL (pharma). Verified schema '{DB_SCHEMA}'.")
+except Exception as e:
+    print(f"[Database Schema Init Notice] {e}")
 
-# Verify PostgreSQL connection; fallback to SQLite if unreachable
-if is_postgres:
-    try:
-        raw_dsn = re.sub(r'^postgresql\+?[^:]*://', 'postgresql://', DATABASE_URL)
-        conn = psycopg2.connect(raw_dsn, connect_timeout=3)
-        cur = conn.cursor()
-        cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB_SCHEMA};")
-        conn.commit()
-        cur.close()
-        conn.close()
-        print(f"[Database] Connected to PostgreSQL. Verified schema '{DB_SCHEMA}'.")
-    except Exception as e:
-        print(f"[Database Notice] PostgreSQL remote unavailable ({e}). Falling back to local SQLite app.db.")
-        DATABASE_URL = "sqlite:///./app.db"
-        is_postgres = False
-
-connect_args = {}
-if is_postgres:
-    connect_args["options"] = f"-c search_path={DB_SCHEMA},public"
-else:
-    connect_args["check_same_thread"] = False
-
+# Configure SQLAlchemy Engine exclusively for PostgreSQL
 engine = create_engine(
     DATABASE_URL, 
     pool_pre_ping=True,
-    connect_args=connect_args
+    connect_args={"options": f"-c search_path={DB_SCHEMA},public"}
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-metadata = MetaData(schema=DB_SCHEMA) if is_postgres else None
+metadata = MetaData(schema=DB_SCHEMA)
 Base = declarative_base(metadata=metadata)
 
 class User(Base):
@@ -66,7 +56,7 @@ class UserQuery(Base):
     __tablename__ = "user_queries"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.users.id" if is_postgres else "users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.users.id", ondelete="CASCADE"), nullable=False)
     query = Column(Text, nullable=False)
     max_results = Column(Integer, default=10)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -77,7 +67,7 @@ class SdrCampaign(Base):
     __tablename__ = "sdr_campaigns"
 
     id = Column(String(36), primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.users.id" if is_postgres else "users.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.users.id", ondelete="CASCADE"), nullable=True)
     target_region = Column(String(255), nullable=False)
     target_sector = Column(String(255), nullable=False)
     status = Column(String(50), default="PENDING")
@@ -94,7 +84,7 @@ class CompanyLead(Base):
     __tablename__ = "company_leads"
 
     id = Column(Integer, primary_key=True, index=True)
-    campaign_id = Column(String(36), ForeignKey(f"{DB_SCHEMA}.sdr_campaigns.id" if is_postgres else "sdr_campaigns.id", ondelete="CASCADE"), nullable=True)
+    campaign_id = Column(String(36), ForeignKey(f"{DB_SCHEMA}.sdr_campaigns.id", ondelete="CASCADE"), nullable=True)
     domain = Column(String(255), index=True, nullable=False)
     name = Column(String(255), nullable=False)
     region = Column(String(255), nullable=True)
@@ -114,7 +104,7 @@ class QualifiedContact(Base):
     __tablename__ = "qualified_contacts"
 
     id = Column(Integer, primary_key=True, index=True)
-    company_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.company_leads.id" if is_postgres else "company_leads.id", ondelete="CASCADE"), nullable=False)
+    company_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.company_leads.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     title = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
@@ -129,7 +119,7 @@ class OutreachSequence(Base):
     __tablename__ = "outreach_sequences"
 
     id = Column(Integer, primary_key=True, index=True)
-    contact_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.qualified_contacts.id" if is_postgres else "qualified_contacts.id", ondelete="CASCADE"), nullable=False)
+    contact_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.qualified_contacts.id", ondelete="CASCADE"), nullable=False)
     step_number = Column(Integer, default=1)
     subject = Column(String(255), nullable=False)
     body_text = Column(Text, nullable=False)
@@ -139,10 +129,7 @@ class OutreachSequence(Base):
     contact = relationship("QualifiedContact", back_populates="sequences")
 
 def init_db():
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"[init_db Notice] {e}")
+    Base.metadata.create_all(bind=engine)
 
 def get_db():
     db = SessionLocal()
