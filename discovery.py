@@ -57,6 +57,25 @@ def is_region_match(target_region: str, candidate_region: str) -> bool:
 
     return False
 
+
+def is_sector_match(target_sec: str, lead_sec: str) -> bool:
+    if not target_sec or target_sec == "ALL":
+        return True
+    if not lead_sec:
+        return True
+    ts = target_sec.lower()
+    ls = lead_sec.lower()
+    if "formulation" in ts or "fdf" in ts:
+        return "formulation" in ls or "fdf" in ls
+    if "api" in ts or "active" in ts:
+        return ("api" in ls or "active" in ls) and "formulation" not in ls and "fdf" not in ls
+    if "device" in ts or "medtech" in ts:
+        return "device" in ls or "medtech" in ls
+    if "biotech" in ts or "gene" in ts:
+        return "biotech" in ls or "gene" in ls or "cell" in ls
+    return True
+
+
 class LeadDiscoveryEngine:
     def __init__(self):
         self.headers = {
@@ -72,6 +91,11 @@ class LeadDiscoveryEngine:
             {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"},
             {"name": "Dar Al Dawa Formulations", "domain": "dadgroup.com", "region": "Amman, Jordan", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "300-700", "website_url": "https://dadgroup.com"},
+            {"name": "Tabuk Pharmaceuticals FDF", "domain": "tabukpharma.com", "region": "Tabuk, Saudi Arabia", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "400-900", "website_url": "https://tabukpharma.com"},
+            {"name": "Hikma Pharmaceuticals MENA", "domain": "hikma.com", "region": "Amman, Jordan", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://hikma.com"},
+            {"name": "Jamjoom Pharmaceuticals FDF", "domain": "jamjoompharma.com", "region": "Jeddah, Saudi Arabia", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "350-800", "website_url": "https://jamjoompharma.com"},
+            {"name": "Taro Pharmaceutical Industries", "domain": "taro.com", "region": "Haifa, Israel", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://taro.com"},
+            {"name": "Perrigo Israel Formulations", "domain": "perrigo.co.il", "region": "Yeruham, Israel", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "200-500", "website_url": "https://perrigo.co.il"},
             {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
             {"name": "Lonza Pharma & Biotech", "domain": "lonza.com", "region": "Basel, Switzerland", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://lonza.com"},
             {"name": "Oxford Biomedica", "domain": "oxb.com", "region": "Oxford, UK", "industry_subsector": "Biotechnology & Gene Therapy Developers", "employee_range": "200-500", "website_url": "https://oxb.com"},
@@ -85,6 +109,22 @@ class LeadDiscoveryEngine:
         matched = [p for p in catalog if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
         if not matched:
             matched = [p for p in catalog if is_region_match(region, p["region"])]
+
+        if sector:
+            sec_lower = sector.lower()
+            if "formulation" in sec_lower or "fdf" in sec_lower:
+                matched_sec = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
+                if matched_sec:
+                    matched = matched_sec
+            elif "api" in sec_lower or "active" in sec_lower:
+                matched_sec = [p for p in matched if "api" in p["industry_subsector"].lower() or "active" in p["industry_subsector"].lower()]
+                if matched_sec:
+                    matched = matched_sec
+            elif "device" in sec_lower or "medtech" in sec_lower:
+                matched_sec = [p for p in matched if "device" in p["industry_subsector"].lower() or "medtech" in p["industry_subsector"].lower()]
+                if matched_sec:
+                    matched = matched_sec
+
         return matched
 
     async def _discover_cdsco_indian_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
@@ -331,28 +371,28 @@ class LeadDiscoveryEngine:
 
         unique_leads = []
         for lead in combined:
-            if lead["domain"] not in seen_domains and is_region_match(target_region, lead["region"]):
+            if lead["domain"] not in seen_domains and is_region_match(target_region, lead["region"]) and is_sector_match(target_sector, lead.get("industry_subsector", "")):
                 seen_domains.add(lead["domain"])
                 unique_leads.append(lead)
                 if max_results < 9999 and len(unique_leads) >= max_results:
                     break
 
-        # Guarantee max_results count is always fulfilled
+        # Guarantee max_results count is always fulfilled with matching sector prospects
         if max_results < 9999 and len(unique_leads) < max_results:
             # Query openFDA with expanded limit to get brand new registered facilities
             fda_extra = await self._discover_fda_registered_facilities(target_region, target_sector, limit=max_results * 5, exclude_domains=seen_domains)
             for lead in fda_extra:
-                if lead["domain"] not in seen_domains:
+                if lead["domain"] not in seen_domains and is_sector_match(target_sector, lead.get("industry_subsector", "")):
                     seen_domains.add(lead["domain"])
                     unique_leads.append(lead)
                     if len(unique_leads) >= max_results:
                         break
 
         if max_results < 9999 and len(unique_leads) < max_results:
-            # Fallback to completing requested count with regional producers
+            # Fallback to completing requested count with regional producers of matching sector
             current_domains = {l["domain"] for l in unique_leads}
             for lead in combined:
-                if lead["domain"] not in current_domains:
+                if lead["domain"] not in current_domains and is_sector_match(target_sector, lead.get("industry_subsector", "")):
                     current_domains.add(lead["domain"])
                     unique_leads.append(lead)
                     if len(unique_leads) >= max_results:
