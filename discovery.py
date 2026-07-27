@@ -82,7 +82,10 @@ class LeadDiscoveryEngine:
             {"name": "Tessa Therapeutics", "domain": "tessatherapeutics.com", "region": "Singapore", "industry_subsector": "Biotechnology & Cell Therapy", "employee_range": "100-300", "website_url": "https://tessatherapeutics.com"},
             {"name": "SK Biotek", "domain": "skbiotek.com", "region": "Sejong, South Korea", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-600", "website_url": "https://skbiotek.com"}
         ]
-        return [p for p in catalog if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
+        matched = [p for p in catalog if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
+        if not matched:
+            matched = [p for p in catalog if is_region_match(region, p["region"])]
+        return matched
 
     async def _discover_cdsco_indian_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries Indian CDSCO, SUGAM Portal & CTRI for active API, formulation & pharma producers."""
@@ -101,6 +104,9 @@ class LeadDiscoveryEngine:
         ]
         
         matched = [p for p in indian_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
+        if not matched:
+            matched = [p for p in indian_producers if is_region_match(region, p["region"])]
+
         if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
             matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
             if matched_sector:
@@ -123,6 +129,9 @@ class LeadDiscoveryEngine:
             {"name": "Smith & Nephew UK", "domain": "smith-nephew.com", "region": "London, UK", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://smith-nephew.com"}
         ]
         matched = [p for p in euro_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
+        if not matched:
+            matched = [p for p in euro_producers if is_region_match(region, p["region"])]
+
         if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
             matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
             if matched_sector:
@@ -142,6 +151,9 @@ class LeadDiscoveryEngine:
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"}
         ]
         matched = [p for p in who_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
+        if not matched:
+            matched = [p for p in who_producers if is_region_match(region, p["region"])]
+
         if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
             matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
             if matched_sector:
@@ -324,5 +336,14 @@ class LeadDiscoveryEngine:
                 unique_leads.append(lead)
                 if max_results < 9999 and len(unique_leads) >= max_results:
                     break
+
+        if not unique_leads:
+            fallback_seen = set()
+            for lead in combined:
+                if lead["domain"] not in fallback_seen and is_region_match(target_region, lead["region"]):
+                    fallback_seen.add(lead["domain"])
+                    unique_leads.append(lead)
+                    if max_results < 9999 and len(unique_leads) >= max_results:
+                        break
 
         return unique_leads
