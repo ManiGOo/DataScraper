@@ -237,10 +237,16 @@ function renderLeadsList(leads) {
                 <div class="contact-info">
                     <h4>${contact.name}</h4>
                     <p>${contact.title}</p>
-                    <div class="email-row">
+                    <div class="email-row" style="flex-wrap:wrap; gap:0.5rem;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                         ${contact.email}
                         <span style="font-size:0.675rem; background:rgba(16, 185, 129, 0.2); color:#34d399; padding:0.1rem 0.4rem; border-radius:4px;">${contact.verification_status}</span>
+                        ${contact.linkedin_url ? `
+                            <a href="${contact.linkedin_url}" target="_blank" style="display:inline-flex; align-items:center; gap:0.25rem; text-decoration:none; font-size:0.7rem; color:#60a5fa; background:rgba(37, 99, 235, 0.15); border:1px solid rgba(96, 165, 250, 0.3); padding:0.1rem 0.45rem; border-radius:4px;">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.25V10.9H6.46M7.86 6.74a1.48 1.48 0 1 0 0 2.96 1.48 1.48 0 0 0 0-2.96z"/></svg>
+                                LinkedIn
+                            </a>
+                        ` : ''}
                     </div>
                 </div>
                 <button class="btn-view-seq" onclick="openSequenceModal(${lead.id}, ${contact.id})">

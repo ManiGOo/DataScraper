@@ -193,7 +193,7 @@ def start_campaign(req: StartCampaignRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"campaign_id": campaign_id, "status": "PENDING"}
 
-@app.get("/api/sdr/campaigns/status/{campaign_id}")
+@app.get("/api/sdr/campaign/{campaign_id}")
 def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
     campaign = db.query(SdrCampaign).filter(SdrCampaign.id == campaign_id).first()
     if not campaign:
@@ -283,9 +283,11 @@ def export_leads(campaign_id: str, file_format: str, db: Session = Depends(get_d
             "Primary Contact": c1.name if c1 else "",
             "Primary Title": c1.title if c1 else "",
             "Primary Work Email": c1.email if c1 else "",
+            "Primary LinkedIn": c1.linkedin_url if c1 else "",
             "Secondary Contact": c2.name if c2 else "",
             "Secondary Title": c2.title if c2 else "",
             "Secondary Work Email": c2.email if c2 else "",
+            "Secondary LinkedIn": c2.linkedin_url if c2 else "",
             "Email Subject": step1.subject if step1 else "",
             "Personalized Hook": step1.personalized_hook if step1 else "",
             "Lead Source": lead.source
