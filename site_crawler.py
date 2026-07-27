@@ -2,6 +2,7 @@ import httpx
 import re
 import asyncio
 from typing import Dict, Any, List, Set
+import urllib.parse
 from urllib.parse import urljoin
 
 class CompanyWebsiteCrawler:
