@@ -267,6 +267,7 @@ class LeadDiscoveryEngine:
         if not selected_sources:
             selected_sources = ["ALL"]
 
+        query_limit = 1000 if max_results >= 9999 else max_results
         seen_domains = set(exclude_domains) if exclude_domains else set()
         combined = []
 
@@ -276,52 +277,40 @@ class LeadDiscoveryEngine:
 
         # 1. CDSCO / SUGAM Portal (India)
         if "CDSCO" in selected_sources or "ALL" in selected_sources or "india" in target_region.lower():
-            cdsco_leads = await self._discover_cdsco_indian_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
+            cdsco_leads = await self._discover_cdsco_indian_facilities(target_region, target_sector, limit=query_limit, exclude_domains=seen_domains)
             combined.extend(cdsco_leads)
 
         # 2. EUDAMED & MHRA (Europe & UK)
         if "EUDAMED" in selected_sources or "ALL" in selected_sources or "europe" in target_region.lower():
-            euro_leads = await self._discover_eudamed_mhra_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
+            euro_leads = await self._discover_eudamed_mhra_facilities(target_region, target_sector, limit=query_limit, exclude_domains=seen_domains)
             combined.extend(euro_leads)
 
         # 3. WHO Prequalification & Global Sponsors
         if "WHO" in selected_sources or "ALL" in selected_sources or "middle east" in target_region.lower():
-            who_leads = await self._discover_who_pq_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
+            who_leads = await self._discover_who_pq_facilities(target_region, target_sector, limit=query_limit, exclude_domains=seen_domains)
             combined.extend(who_leads)
 
         # 4. openFDA (US & Global Export Facilities)
         if "FDA" in selected_sources or "ALL" in selected_sources:
-            fda_leads = await self._discover_fda_registered_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
+            fda_leads = await self._discover_fda_registered_facilities(target_region, target_sector, limit=query_limit, exclude_domains=seen_domains)
             combined.extend(fda_leads)
 
         # 5. Health Canada API (Canada)
         if "HEALTH_CANADA" in selected_sources or "ALL" in selected_sources or "canada" in target_region.lower():
-            hc_leads = await self._discover_health_canada_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
+            hc_leads = await self._discover_health_canada_facilities(target_region, target_sector, limit=query_limit, exclude_domains=seen_domains)
             combined.extend(hc_leads)
 
         # 6. LATAM ANVISA Registry (South America)
         if "ANVISA" in selected_sources or "ALL" in selected_sources or "south america" in target_region.lower() or "brazil" in target_region.lower():
-            latam_leads = await self._discover_latam_anvisa_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
+            latam_leads = await self._discover_latam_anvisa_facilities(target_region, target_sector, limit=query_limit, exclude_domains=seen_domains)
             combined.extend(latam_leads)
 
         unique_leads = []
-
-        # Strict regional check loop
         for lead in combined:
-            if is_region_match(target_region, lead["region"]):
-                if lead["domain"] not in seen_domains:
-                    seen_domains.add(lead["domain"])
-                    unique_leads.append(lead)
-                    if len(unique_leads) >= max_results:
-                        break
-
-        # Fallback if less than max_results found (strictly checking region)
-        if len(unique_leads) < max_results:
-            for lead in combined:
-                if is_region_match(target_region, lead["region"]) and lead["domain"] not in seen_domains:
-                    seen_domains.add(lead["domain"])
-                    unique_leads.append(lead)
-                    if len(unique_leads) >= max_results:
-                        break
+            if lead["domain"] not in seen_domains and is_region_match(target_region, lead["region"]):
+                seen_domains.add(lead["domain"])
+                unique_leads.append(lead)
+                if max_results < 9999 and len(unique_leads) >= max_results:
+                    break
 
         return unique_leads
