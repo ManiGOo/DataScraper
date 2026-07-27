@@ -186,6 +186,7 @@ def read_root():
     return "<h1>AI SDR eQMS Lead Generator API is running!</h1>"
 
 @app.post("/api/sdr/campaigns/start")
+@app.post("/api/sdr/start-campaign")
 def start_campaign(req: StartCampaignRequest, db: Session = Depends(get_db)):
     campaign_id = str(uuid.uuid4())
     sources = req.selected_sources if req.selected_sources else ["ALL"]
@@ -203,6 +204,7 @@ def start_campaign(req: StartCampaignRequest, db: Session = Depends(get_db)):
     return {"campaign_id": campaign_id, "status": "PENDING"}
 
 @app.get("/api/sdr/campaign/{campaign_id}")
+@app.get("/api/sdr/campaigns/status/{campaign_id}")
 def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
     campaign = db.query(SdrCampaign).filter(SdrCampaign.id == campaign_id).first()
     if not campaign:
