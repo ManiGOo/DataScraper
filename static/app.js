@@ -79,34 +79,25 @@ function setPreset(region) {
     const srcEUDAMED = document.getElementById('srcEUDAMED');
     const srcFDA = document.getElementById('srcFDA');
     const srcWHO = document.getElementById('srcWHO');
+    const srcHC = document.getElementById('srcHEALTH_CANADA');
+    const srcANVISA = document.getElementById('srcANVISA');
+
+    document.querySelectorAll('.src-checkbox').forEach(cb => cb.checked = false);
+    srcALL.checked = false;
 
     if (regLower.includes('india')) {
-        srcALL.checked = false;
-        srcCDSCO.checked = true;
-        srcEUDAMED.checked = false;
-        srcFDA.checked = false;
-        srcWHO.checked = false;
+        if (srcCDSCO) srcCDSCO.checked = true;
     } else if (regLower.includes('europe') || regLower.includes('uk') || regLower.includes('germany')) {
-        srcALL.checked = false;
-        srcCDSCO.checked = false;
-        srcEUDAMED.checked = true;
-        srcFDA.checked = false;
-        srcWHO.checked = false;
-    } else if (regLower.includes('north america') || regLower.includes('usa')) {
-        srcALL.checked = false;
-        srcCDSCO.checked = false;
-        srcEUDAMED.checked = false;
-        srcFDA.checked = true;
-        srcWHO.checked = false;
+        if (srcEUDAMED) srcEUDAMED.checked = true;
+    } else if (regLower.includes('north america') || regLower.includes('usa') || regLower.includes('canada')) {
+        if (srcFDA) srcFDA.checked = true;
+        if (srcHC) srcHC.checked = true;
+    } else if (regLower.includes('south america') || regLower.includes('brazil')) {
+        if (srcANVISA) srcANVISA.checked = true;
     } else if (regLower.includes('middle east')) {
-        srcALL.checked = false;
-        srcCDSCO.checked = false;
-        srcEUDAMED.checked = false;
-        srcFDA.checked = false;
-        srcWHO.checked = true;
+        if (srcWHO) srcWHO.checked = true;
     } else {
         srcALL.checked = true;
-        document.querySelectorAll('.src-checkbox').forEach(cb => cb.checked = false);
     }
     updateDropdownButtonText();
 }
