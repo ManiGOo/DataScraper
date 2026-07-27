@@ -635,7 +635,7 @@
                                         LinkedIn
                                     </a>
                                 ` : ''}
-                                <a href="${contact.web_search_url || ('https://www.google.com/search?q=' + encodeURIComponent('"' + contact.name + '" "' + lead.name.replace(/[^a-zA-Z0-9\s]/g, '').split(' ')[0] + '" "' + (contact.title.toLowerCase().includes('quality') ? 'Quality Assurance' : 'Regulatory Affairs') + '" "' + (lead.region ? lead.region.split(',')[0].trim() : '') + '"'))}" target="_blank" style="display:inline-flex; align-items:center; gap:0.25rem; text-decoration:none; font-size:0.7rem; color:#e0e7ff; background:linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3)); border:1px solid rgba(168, 85, 247, 0.4); padding:0.1rem 0.55rem; border-radius:4px; font-weight:600; box-shadow:0 2px 8px rgba(168, 85, 247, 0.2);">
+                                <a href="${contact.web_search_url || ('https://www.google.com/search?q=' + encodeURIComponent(lead.name.replace(/[^a-zA-Z0-9\s]/g, '').split(' ')[0] + ' ' + (contact.title.toLowerCase().includes('quality') ? 'Quality Assurance' : 'Regulatory Affairs') + ' ' + (lead.region ? lead.region.split(',')[0].trim() : '') + ' LinkedIn profile'))}" target="_blank" style="display:inline-flex; align-items:center; gap:0.25rem; text-decoration:none; font-size:0.7rem; color:#e0e7ff; background:linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3)); border:1px solid rgba(168, 85, 247, 0.4); padding:0.1rem 0.55rem; border-radius:4px; font-weight:600; box-shadow:0 2px 8px rgba(168, 85, 247, 0.2);">
                                     🔍 Web Search
                                 </a>
                             </div>

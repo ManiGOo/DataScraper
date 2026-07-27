@@ -230,9 +230,10 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
             company_kw = company_clean.split()[0] if company_clean else lead.name.split()[0]
             city_token = lead.region.split(',')[0].strip() if lead.region else ""
             role_kw = "Quality Assurance" if "quality" in contact.title.lower() else ("Regulatory Affairs" if "regulatory" in contact.title.lower() else contact.title.split()[0])
-            g_parts = [f'"{contact.name}"', f'"{company_kw}"', f'"{role_kw}"']
+            g_parts = [company_kw, role_kw]
             if city_token:
-                g_parts.append(f'"{city_token}"')
+                g_parts.append(city_token)
+            g_parts.append("LinkedIn profile")
             g_query = urllib.parse.quote_plus(" ".join(g_parts))
             web_search_url = f"https://www.google.com/search?q={g_query}"
 

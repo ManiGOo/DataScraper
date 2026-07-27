@@ -56,7 +56,7 @@ class QuickLeadLinkedInResolver:
         return f"https://www.linkedin.com/search/results/people/?keywords={query}"
 
     def resolve_google_web_search(self, full_name: str, company_name: str, title: str, location_address: str = "") -> str:
-        """Generates Google Advanced Web Search query matching name, company, title & address across the entire open web."""
+        """Generates clean unquoted Google Advanced Web Search query matching company, role, city & LinkedIn/Social web pages."""
         company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', company_name)
         company_clean = re.sub(r'[^a-zA-Z0-9\s]', '', company_clean).strip()
         company_keyword = company_clean.split()[0] if company_clean else company_name.split()[0]
@@ -67,10 +67,11 @@ class QuickLeadLinkedInResolver:
             
         role_kw = "Quality Assurance" if "quality" in title.lower() else ("Regulatory Affairs" if "regulatory" in title.lower() else title.split()[0])
         
-        # Open Web Search Query matching Name + Company + Role + Address across all web sites & social networks
-        query_parts = [f'"{full_name}"', f'"{company_keyword}"', f'"{role_kw}"']
+        # Clean unquoted keyword search (e.g. "Torrent Regulatory Affairs Ahmedabad LinkedIn profile")
+        query_parts = [company_keyword, role_kw]
         if city_token:
-            query_parts.append(f'"{city_token}"')
+            query_parts.append(city_token)
+        query_parts.append("LinkedIn profile")
             
         g_query = urllib.parse.quote_plus(" ".join(query_parts))
         return f"https://www.google.com/search?q={g_query}"
