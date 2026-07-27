@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 import asyncio
+import re
 import urllib.parse
 import pandas as pd
 from typing import List, Dict, Any, Optional
