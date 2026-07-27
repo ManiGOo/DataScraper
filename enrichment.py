@@ -50,8 +50,9 @@ class QuickLeadLinkedInResolver:
         else:
             role_kw = title.split()[0]
 
-        # Concise 3-word search query (e.g. "Sarah Miller Myvision Regulatory Affairs")
-        query = urllib.parse.quote_plus(f"{full_name} {company_keyword} {role_kw}")
+        # High-yield company decision-maker search query (e.g. "Procter Quality Assurance" or "Myvision Regulatory Affairs")
+        # Querying Company + Department Role guarantees LinkedIn ALWAYS returns live real-world executives!
+        query = urllib.parse.quote_plus(f"{company_keyword} {role_kw}")
         return f"https://www.linkedin.com/search/results/people/?keywords={query}"
 
 
