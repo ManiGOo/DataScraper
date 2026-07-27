@@ -188,14 +188,14 @@ async function checkCampaignStatus() {
 
         if (data.status === 'RUNNING') {
             progressTitle.innerText = "Mining Registries & AI Scoring Prospects...";
-            renderLeadsList(currentLeadsData);
+            renderLeadsList(currentLeadsData, data.error_message);
         } else if (data.status === 'COMPLETED') {
             clearInterval(pollInterval);
             progressTitle.innerText = "Scan Completed & Qualified";
             progressBar.style.width = '100%';
             progressPercent.innerText = '100%';
             resetUI();
-            renderLeadsList(currentLeadsData);
+            renderLeadsList(currentLeadsData, data.error_message);
         } else if (data.status === 'FAILED') {
             clearInterval(pollInterval);
             alert("Scan failed: " + data.error_message);
@@ -212,14 +212,17 @@ function resetUI() {
     btnLaunch.style.opacity = '1';
 }
 
-function renderLeadsList(leads) {
+function renderLeadsList(leads, errorMessage = null) {
     const leadsList = document.getElementById('leadsList');
     const summarySubtitle = document.getElementById('summarySubtitle');
 
     if (!leads || leads.length === 0) {
+        const msg = errorMessage || "Mining selected government registries and web text for target prospects...";
         leadsList.innerHTML = `
-            <div class="card" style="text-align:center; padding:3rem; color:var(--text-muted);">
-                <p>Mining selected government registries and web text for target prospects...</p>
+            <div class="card" style="text-align:center; padding:3rem; color:var(--text-muted); border:1px solid rgba(234, 179, 8, 0.3); background:rgba(234, 179, 8, 0.05);">
+                <div style="font-size:2.5rem; margin-bottom:1rem;">💡</div>
+                <h4 style="color:#fde047; margin-bottom:0.5rem;">Data Extraction Notice</h4>
+                <p style="max-width:600px; margin:0 auto; font-size:0.9rem; line-height:1.6; color:var(--text-secondary);">${msg}</p>
             </div>
         `;
         return;

@@ -59,6 +59,15 @@ async def background_sdr_worker():
                             exclude_domains=existing_domains
                         )
                         
+                        campaign.total_expected = len(raw_leads) if raw_leads else 0
+                        db.commit()
+
+                        if not raw_leads:
+                            campaign.status = "COMPLETED"
+                            campaign.error_message = "All available unique prospects for this target region & sector have already been extracted in prior runs. Add state names or select additional regulatory registries to discover new data."
+                            db.commit()
+                            continue
+                        
                         processed_count = 0
                         processed_domains = set()
                         for lead_item in raw_leads:
