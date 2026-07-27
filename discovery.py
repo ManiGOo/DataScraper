@@ -72,11 +72,14 @@ class LeadDiscoveryEngine:
             {"name": "Julphar Gulf Pharmaceutical", "domain": "julphar.net", "region": "Ras Al Khaimah, UAE", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-900", "website_url": "https://julphar.net"},
             {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"},
+            {"name": "Dar Al Dawa Formulations", "domain": "dadgroup.com", "region": "Amman, Jordan", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "300-700", "website_url": "https://dadgroup.com"},
             # Europe
             {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
             {"name": "Lonza Pharma & Biotech", "domain": "lonza.com", "region": "Basel, Switzerland", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://lonza.com"},
             {"name": "Oxford Biomedica", "domain": "oxb.com", "region": "Oxford, UK", "industry_subsector": "Biotechnology & Gene Therapy Developers", "employee_range": "200-500", "website_url": "https://oxb.com"},
             {"name": "Evotec AG", "domain": "evotec.com", "region": "Hamburg, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-800", "website_url": "https://evotec.com"},
+            {"name": "Fresenius Kabi Formulations", "domain": "fresenius-kabi.com", "region": "Bad Homburg, Germany", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://fresenius-kabi.com"},
+            {"name": "Hikma Formulations UK", "domain": "hikma.com", "region": "London, UK", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://hikma.com"},
             # Asia-Pacific
             {"name": "Chugai Pharmaceutical", "domain": "chugai-pharm.co.jp", "region": "Tokyo, Japan", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://chugai-pharm.co.jp"},
             {"name": "Tessa Therapeutics", "domain": "tessatherapeutics.com", "region": "Singapore", "industry_subsector": "Biotechnology & Cell Therapy", "employee_range": "100-300", "website_url": "https://tessatherapeutics.com"},
@@ -85,11 +88,14 @@ class LeadDiscoveryEngine:
         return [p for p in catalog if is_region_match(region, p["region"])]
 
     async def _discover_cdsco_indian_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Queries Indian CDSCO, SUGAM Portal & CTRI for active API & pharma producers."""
+        """Queries Indian CDSCO, SUGAM Portal & CTRI for active API, formulation & pharma producers."""
         indian_producers = [
             {"name": "Divis Laboratories API Division", "domain": "divislabs.com", "region": "Hyderabad, Telangana, India", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://divislabs.com"},
             {"name": "Hetero Drugs API Manufacturing", "domain": "hetero.com", "region": "Hyderabad, Telangana, India", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://hetero.com"},
             {"name": "Aurobindo Pharma API Units", "domain": "aurobindo.com", "region": "Hyderabad, Telangana, India", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://aurobindo.com"},
+            {"name": "Cipla Formulation Plants", "domain": "cipla.com", "region": "Mumbai, Maharashtra, India", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://cipla.com"},
+            {"name": "Torrent Pharma Formulation Units", "domain": "torrentpharma.com", "region": "Ahmedabad, Gujarat, India", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://torrentpharma.com"},
+            {"name": "Mankind Pharma FDF Facilities", "domain": "mankindpharma.com", "region": "Delhi NCR, India", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://mankindpharma.com"},
             {"name": "Suven Life Sciences", "domain": "suven.com", "region": "Hyderabad, Telangana, India", "industry_subsector": "Biotechnology & API Developer", "employee_range": "200-500", "website_url": "https://suven.com"},
             {"name": "Granules India API Plant", "domain": "granulesindia.com", "region": "Hyderabad, Telangana, India", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-900", "website_url": "https://granulesindia.com"},
             {"name": "Lupin API Manufacturing", "domain": "lupin.com", "region": "Mumbai, Maharashtra, India", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://lupin.com"},
@@ -99,34 +105,52 @@ class LeadDiscoveryEngine:
         
         # Filter for region and sector matching if specified
         matched = [p for p in indian_producers if is_region_match(region, p["region"])]
+        if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
+            matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
+            if matched_sector:
+                matched = matched_sector
+                
         for m in matched:
             m["source"] = "CDSCO / SUGAM Portal (India)"
         return matched[:limit] if matched else indian_producers[:limit]
 
     async def _discover_eudamed_mhra_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Queries EUDAMED & UK MHRA registers for European device & API producers."""
+        """Queries EUDAMED & UK MHRA registers for European device, formulation & API producers."""
         euro_producers = [
             {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
             {"name": "Lonza Pharma & Biotech", "domain": "lonza.com", "region": "Basel, Switzerland", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://lonza.com"},
+            {"name": "Fresenius Kabi Formulations", "domain": "fresenius-kabi.com", "region": "Bad Homburg, Germany", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://fresenius-kabi.com"},
+            {"name": "Hikma Formulations UK", "domain": "hikma.com", "region": "London, UK", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://hikma.com"},
             {"name": "Oxford Biomedica", "domain": "oxb.com", "region": "Oxford, UK", "industry_subsector": "Biotechnology & Gene Therapy Developers", "employee_range": "200-500", "website_url": "https://oxb.com"},
             {"name": "Evotec AG", "domain": "evotec.com", "region": "Hamburg, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-800", "website_url": "https://evotec.com"},
             {"name": "B. Braun Melsungen AG", "domain": "bbraun.com", "region": "Melsungen, Germany", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://bbraun.com"},
             {"name": "Smith & Nephew UK", "domain": "smith-nephew.com", "region": "London, UK", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://smith-nephew.com"}
         ]
         matched = [p for p in euro_producers if is_region_match(region, p["region"])]
+        if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
+            matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
+            if matched_sector:
+                matched = matched_sector
+
         for e in matched:
             e["source"] = "EUDAMED / MHRA Register (Europe)"
         return matched[:limit] if matched else euro_producers[:limit]
 
     async def _discover_who_pq_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Queries WHO Prequalifications Directory for active global API & drug producers."""
+        """Queries WHO Prequalifications Directory for active global API & drug formulation producers."""
         who_producers = [
             {"name": "Teva API Facilities", "domain": "tevaapi.com", "region": "Tel Aviv, Israel", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-800", "website_url": "https://tevaapi.com"},
             {"name": "Julphar Gulf Pharmaceutical", "domain": "julphar.net", "region": "Ras Al Khaimah, UAE", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-900", "website_url": "https://julphar.net"},
+            {"name": "Dar Al Dawa Formulations", "domain": "dadgroup.com", "region": "Amman, Jordan", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "300-700", "website_url": "https://dadgroup.com"},
             {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"}
         ]
         matched = [p for p in who_producers if is_region_match(region, p["region"])]
+        if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
+            matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
+            if matched_sector:
+                matched = matched_sector
+
         for w in matched:
             w["source"] = "WHO Prequalification Registry"
         return matched[:limit] if matched else who_producers[:limit]

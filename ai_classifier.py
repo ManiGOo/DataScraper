@@ -40,8 +40,8 @@ class AIProspectClassifier:
             return self._rule_based_fallback_scoring(lead_data, crawl_data)
 
         prompt = f"""
-You are an expert Quality Management System (eQMS) Sales Analyst specializing in Life Science Producers, Active Pharmaceutical Ingredient (API) Manufacturers, Medical Devices, and Agri-Biotech developers.
-Evaluate this company prospect for selling eQMS software (ISO 13485 / FDA 21 CFR Part 11 / EMA GxP compliance).
+You are an expert Quality Management System (eQMS) Sales Analyst specializing in Life Science Producers, Active Pharmaceutical Ingredient (API) Manufacturers, Pharmaceutical Formulations & Finished Dosage (FDF), Medical Devices, and Agri-Biotech developers.
+Evaluate this company prospect for selling eQMS software (ISO 13485 / FDA 21 CFR Part 11 / 21 CFR Part 211 / EMA GxP compliance).
 
 Company Name: {lead_data.get('name')}
 Sub-sector: {lead_data.get('industry_subsector')}
