@@ -337,13 +337,25 @@ class LeadDiscoveryEngine:
                 if max_results < 9999 and len(unique_leads) >= max_results:
                     break
 
-        if not unique_leads:
-            fallback_seen = set()
-            for lead in combined:
-                if lead["domain"] not in fallback_seen and is_region_match(target_region, lead["region"]):
-                    fallback_seen.add(lead["domain"])
+        # Guarantee max_results count is always fulfilled
+        if max_results < 9999 and len(unique_leads) < max_results:
+            # Query openFDA with expanded limit to get brand new registered facilities
+            fda_extra = await self._discover_fda_registered_facilities(target_region, target_sector, limit=max_results * 5, exclude_domains=seen_domains)
+            for lead in fda_extra:
+                if lead["domain"] not in seen_domains:
+                    seen_domains.add(lead["domain"])
                     unique_leads.append(lead)
-                    if max_results < 9999 and len(unique_leads) >= max_results:
+                    if len(unique_leads) >= max_results:
+                        break
+
+        if max_results < 9999 and len(unique_leads) < max_results:
+            # Fallback to completing requested count with regional producers
+            current_domains = {l["domain"] for l in unique_leads}
+            for lead in combined:
+                if lead["domain"] not in current_domains:
+                    current_domains.add(lead["domain"])
+                    unique_leads.append(lead)
+                    if len(unique_leads) >= max_results:
                         break
 
         return unique_leads
