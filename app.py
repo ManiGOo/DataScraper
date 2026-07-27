@@ -361,9 +361,12 @@ def get_all_stored_records(
     sector: Optional[str] = None,
     source: Optional[str] = None,
     search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import or_
+    import math
     query = db.query(CompanyLead)
     
     if region and region != "ALL":
@@ -399,13 +402,24 @@ def get_all_stored_records(
         
     leads = query.order_by(CompanyLead.created_at.desc()).all()
     
-    lead_results = []
+    unique_leads = []
     seen_domains = set()
     for lead in leads:
         if lead.domain in seen_domains:
             continue
         seen_domains.add(lead.domain)
-        
+        unique_leads.append(lead)
+
+    total_records = len(unique_leads)
+    safe_limit = max(1, limit)
+    total_pages = math.ceil(total_records / safe_limit) if total_records > 0 else 1
+    safe_page = max(1, min(page, total_pages))
+    start_idx = (safe_page - 1) * safe_limit
+    end_idx = start_idx + safe_limit
+    paginated_slice = unique_leads[start_idx:end_idx]
+    
+    lead_results = []
+    for lead in paginated_slice:
         contacts_data = []
         for contact in lead.contacts:
             seqs_data = [
@@ -426,6 +440,13 @@ def get_all_stored_records(
                 "sequences": seqs_data
             })
             
+        social_links_data = {}
+        if lead.social_links:
+            try:
+                social_links_data = json.loads(lead.social_links)
+            except Exception:
+                pass
+
         lead_results.append({
             "id": lead.id,
             "campaign_id": lead.campaign_id,
@@ -439,12 +460,17 @@ def get_all_stored_records(
             "summary": lead.summary,
             "website_url": lead.website_url,
             "source": lead.source,
+            "social_links": social_links_data,
             "contacts": contacts_data,
             "created_at": lead.created_at.isoformat() if lead.created_at else ""
         })
 
     return {
-        "total_count": len(lead_results),
+        "total": total_records,
+        "page": safe_page,
+        "limit": safe_limit,
+        "total_pages": total_pages,
+        "total_count": total_records,
         "leads": lead_results
     }
 

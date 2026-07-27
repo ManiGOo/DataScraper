@@ -212,6 +212,30 @@ function resetUI() {
     btnLaunch.style.opacity = '1';
 }
 
+let currentScannerPage = 1;
+let scannerPageLimit = 5;
+
+function changeScannerLimit(val) {
+    scannerPageLimit = parseInt(val, 10);
+    currentScannerPage = 1;
+    renderLeadsList(currentLeadsData);
+}
+
+function prevScannerPage() {
+    if (currentScannerPage > 1) {
+        currentScannerPage--;
+        renderLeadsList(currentLeadsData);
+    }
+}
+
+function nextScannerPage() {
+    const totalPages = Math.ceil((currentLeadsData || []).length / scannerPageLimit) || 1;
+    if (currentScannerPage < totalPages) {
+        currentScannerPage++;
+        renderLeadsList(currentLeadsData);
+    }
+}
+
 function renderLeadsList(leads, errorMessage = null) {
     const leadsList = document.getElementById('leadsList');
     const summarySubtitle = document.getElementById('summarySubtitle');
@@ -228,9 +252,16 @@ function renderLeadsList(leads, errorMessage = null) {
         return;
     }
 
-    summarySubtitle.innerText = `Found ${leads.length} qualified Life Science prospects. Sorted by QMS Fit Score.`;
+    const totalLeads = leads.length;
+    const totalPages = Math.ceil(totalLeads / scannerPageLimit) || 1;
+    if (currentScannerPage > totalPages) currentScannerPage = totalPages;
+    const startIdx = (currentScannerPage - 1) * scannerPageLimit;
+    const endIdx = Math.min(startIdx + scannerPageLimit, totalLeads);
+    const paginatedLeads = leads.slice(startIdx, endIdx);
 
-    leadsList.innerHTML = leads.map(lead => {
+    summarySubtitle.innerText = `Found ${totalLeads} qualified Life Science prospects. Showing page ${currentScannerPage} of ${totalPages}.`;
+
+    const cardsHtml = paginatedLeads.map(lead => {
         const fitScore = lead.qms_fit_score || 70;
         const scoreClass = fitScore >= 80 ? 'score-high' : 'score-med';
         const drivers = lead.compliance_drivers || [];
@@ -303,6 +334,26 @@ function renderLeadsList(leads, errorMessage = null) {
             </div>
         `;
     }).join('');
+
+    const paginationHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; padding:0.75rem 1rem; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:10px; flex-wrap:wrap; gap:0.75rem;">
+            <div style="font-size:0.85rem; color:var(--text-secondary);">
+                Showing prospects ${startIdx + 1}-${endIdx} of ${totalLeads}
+            </div>
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <select onchange="changeScannerLimit(this.value)" style="background:rgba(0,0,0,0.4); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:0.3rem 0.6rem; border-radius:6px; font-size:0.8rem; cursor:pointer;">
+                    <option value="5" ${scannerPageLimit === 5 ? 'selected' : ''}>5 per page</option>
+                    <option value="10" ${scannerPageLimit === 10 ? 'selected' : ''}>10 per page</option>
+                    <option value="25" ${scannerPageLimit === 25 ? 'selected' : ''}>25 per page</option>
+                </select>
+                <button onclick="prevScannerPage()" ${currentScannerPage <= 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:0.3rem 0.75rem; border-radius:6px; font-size:0.8rem; cursor:pointer; opacity:${currentScannerPage <= 1 ? '0.4' : '1'};">◀ Prev</button>
+                <span style="font-size:0.85rem; font-weight:600; color:#e0e7ff;">Page ${currentScannerPage} of ${totalPages}</span>
+                <button onclick="nextScannerPage()" ${currentScannerPage >= totalPages ? 'disabled' : ''} style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:0.3rem 0.75rem; border-radius:6px; font-size:0.8rem; cursor:pointer; opacity:${currentScannerPage >= totalPages ? '0.4' : '1'};">Next ▶</button>
+            </div>
+        </div>
+    `;
+
+    leadsList.innerHTML = cardsHtml + paginationHtml;
 }
 
 function openSequenceModal(leadId, contactId) {

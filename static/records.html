@@ -510,15 +510,33 @@
     <script>
         let allLeads = [];
         let activeRegion = 'ALL';
+        let currentRecordsPage = 1;
+        let recordsPageLimit = 10;
 
         async function fetchStoredRecords() {
             try {
-                const resp = await fetch('/api/sdr/records');
+                const sector = document.getElementById('sectorFilter') ? document.getElementById('sectorFilter').value : 'ALL';
+                const search = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
+                
+                const params = new URLSearchParams({
+                    region: activeRegion,
+                    sector: sector,
+                    search: search,
+                    page: currentRecordsPage,
+                    limit: recordsPageLimit
+                });
+                
+                const resp = await fetch(`/api/sdr/records?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
                 if (resp.ok) {
                     const data = await resp.json();
                     allLeads = data.leads || [];
-                    document.getElementById('librarySubtitle').innerText = `Displaying ${allLeads.length} total qualified Life Science producers stored in PostgreSQL (schema ai_sdr).`;
-                    renderRecords(allLeads);
+                    const total = data.total || allLeads.length;
+                    const totalPages = data.total_pages || 1;
+                    
+                    document.getElementById('librarySubtitle').innerText = `Displaying ${total} total qualified Life Science producers stored in PostgreSQL. Page ${data.page} of ${totalPages}.`;
+                    renderRecords(allLeads, total, data.page, totalPages, data.limit);
                 }
             } catch (err) {
                 console.error("Error fetching records:", err);
@@ -527,91 +545,43 @@
 
         function setRegionFilter(region, btnElem) {
             activeRegion = region;
+            currentRecordsPage = 1;
             document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
             btnElem.classList.add('active');
-            filterRecords();
-        }
-
-        function isRegionMatch(activeReg, leadRegion) {
-            if (!activeReg || activeReg === 'ALL') return true;
-            if (!leadRegion) return false;
-            
-            const regLower = leadRegion.toLowerCase();
-            const activeLower = activeReg.toLowerCase();
-            
-            if (regLower.includes(activeLower)) return true;
-
-            if (activeLower.includes('middle east')) {
-                return regLower.includes('israel') || regLower.includes('uae') || regLower.includes('saudi') || 
-                       regLower.includes('jordan') || regLower.includes('dubai') || regLower.includes('tel aviv') || 
-                       regLower.includes('ras al khaimah') || regLower.includes('petah tikva') || regLower.includes('riyadh') || 
-                       regLower.includes('amman');
-            }
-            if (activeLower.includes('europe')) {
-                return regLower.includes('germany') || regLower.includes('uk') || regLower.includes('switzerland') || 
-                       regLower.includes('france') || regLower.includes('italy') || regLower.includes('london') || 
-                       regLower.includes('basel') || regLower.includes('göttingen') || regLower.includes('hamburg') || 
-                       regLower.includes('melsungen') || regLower.includes('oxford');
-            }
-            if (activeLower.includes('india')) {
-                return regLower.includes('india') || regLower.includes('in') || regLower.includes('hyderabad') || 
-                       regLower.includes('gujarat') || regLower.includes('mumbai') || regLower.includes('delhi') || 
-                       regLower.includes('noida') || regLower.includes('chennai') || regLower.includes('vadodara') || 
-                       regLower.includes('telangana') || regLower.includes('maharashtra');
-            }
-            if (activeLower.includes('north america') || activeLower.includes('usa') || activeLower.includes('canada')) {
-                return regLower.includes('usa') || regLower.includes('canada') || regLower.includes('ontario') || 
-                       regLower.includes('quebec') || regLower.includes('vancouver') || regLower.includes('toronto') || 
-                       regLower.includes('montreal') || regLower.includes('massachusetts') || regLower.includes('boston') || 
-                       regLower.includes('us') || regLower.includes('ca');
-            }
-            if (activeLower.includes('south america') || activeLower.includes('brazil')) {
-                return regLower.includes('brazil') || regLower.includes('argentina') || regLower.includes('mexico') || 
-                       regLower.includes('são paulo') || regLower.includes('buenos aires') || regLower.includes('mexico city');
-            }
-            if (activeLower.includes('asia-pacific') || activeLower.includes('japan')) {
-                return regLower.includes('japan') || regLower.includes('singapore') || regLower.includes('south korea') || 
-                       regLower.includes('tokyo') || regLower.includes('sejong');
-            }
-            return false;
+            fetchStoredRecords();
         }
 
         function filterRecords() {
-            const search = document.getElementById('searchInput').value.toLowerCase().trim();
-            const sector = document.getElementById('sectorFilter').value;
-
-            const filtered = allLeads.filter(lead => {
-                // Region filter using smart token matching
-                if (!isRegionMatch(activeRegion, lead.region)) {
-                    return false;
-                }
-                // Sector filter
-                if (sector !== 'ALL') {
-                    const secLower = lead.industry_subsector ? lead.industry_subsector.toLowerCase() : '';
-                    if (!secLower.includes(sector.toLowerCase())) return false;
-                }
-                // Search input filter
-                if (search) {
-                    const name = lead.name ? lead.name.toLowerCase() : '';
-                    const domain = lead.domain ? lead.domain.toLowerCase() : '';
-                    const reg = lead.region ? lead.region.toLowerCase() : '';
-                    const sum = lead.summary ? lead.summary.toLowerCase() : '';
-                    if (!name.includes(search) && !domain.includes(search) && !reg.includes(search) && !sum.includes(search)) {
-                        return false;
-                    }
-                }
-                return true;
-            });
-
-            renderRecords(filtered);
+            currentRecordsPage = 1;
+            fetchStoredRecords();
         }
 
-        function renderRecords(leads) {
+        function changeRecordsLimit(val) {
+            recordsPageLimit = parseInt(val, 10);
+            currentRecordsPage = 1;
+            fetchStoredRecords();
+        }
+
+        function prevRecordsPage() {
+            if (currentRecordsPage > 1) {
+                currentRecordsPage--;
+                fetchStoredRecords();
+            }
+        }
+
+        function nextRecordsPage(totalPages) {
+            if (currentRecordsPage < totalPages) {
+                currentRecordsPage++;
+                fetchStoredRecords();
+            }
+        }
+
+        function renderRecords(leads, total = 0, page = 1, totalPages = 1, limit = 10) {
             const grid = document.getElementById('recordsGrid');
 
             if (!leads || leads.length === 0) {
                 grid.innerHTML = `
-                    <div class="lead-card" style="text-align:center; padding:3rem; color:var(--text-muted);">
+                    <div class="lead-card" style="grid-column: 1 / -1; text-align:center; padding:3rem; color:var(--text-muted);">
                         <p style="font-size:1.1rem; color:var(--text-main); margin-bottom:0.5rem;">No stored records found matching filter criteria.</p>
                         <p style="font-size:0.875rem;">Try selecting 'All Target Regions' or clear search keywords.</p>
                     </div>
@@ -619,7 +589,7 @@
                 return;
             }
 
-            grid.innerHTML = leads.map(lead => {
+            const cardsHtml = leads.map(lead => {
                 const fitScore = lead.qms_fit_score || 75;
                 const contactsHtml = (lead.contacts || []).map(contact => `
                     <div class="contact-card">
@@ -683,6 +653,28 @@
                     </div>
                 `;
             }).join('');
+
+            const startIdx = (page - 1) * limit;
+            const endIdx = Math.min(startIdx + limit, total);
+            const paginationHtml = `
+                <div style="grid-column: 1 / -1; display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; padding:0.75rem 1rem; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:10px; flex-wrap:wrap; gap:0.75rem;">
+                    <div style="font-size:0.85rem; color:var(--text-secondary);">
+                        Showing records ${startIdx + 1}-${endIdx} of ${total}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <select onchange="changeRecordsLimit(this.value)" style="background:rgba(0,0,0,0.4); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:0.3rem 0.6rem; border-radius:6px; font-size:0.8rem; cursor:pointer;">
+                            <option value="5" ${limit === 5 ? 'selected' : ''}>5 per page</option>
+                            <option value="10" ${limit === 10 ? 'selected' : ''}>10 per page</option>
+                            <option value="25" ${limit === 25 ? 'selected' : ''}>25 per page</option>
+                            <option value="50" ${limit === 50 ? 'selected' : ''}>50 per page</option>
+                        </select>
+                        <button onclick="prevRecordsPage()" ${page <= 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:0.3rem 0.75rem; border-radius:6px; font-size:0.8rem; cursor:pointer; opacity:${page <= 1 ? '0.4' : '1'};">◀ Prev</button>
+                        <span style="font-size:0.85rem; font-weight:600; color:#e0e7ff;">Page ${page} of ${totalPages}</span>
+                        <button onclick="nextRecordsPage(${totalPages})" ${page >= totalPages ? 'disabled' : ''} style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:0.3rem 0.75rem; border-radius:6px; font-size:0.8rem; cursor:pointer; opacity:${page >= totalPages ? '0.4' : '1'};">Next ▶</button>
+                    </div>
+                </div>
+            `;
+            grid.innerHTML = cardsHtml + paginationHtml;
         }
 
         function openModal(contactName, sequences) {
