@@ -55,13 +55,24 @@ class QuickLeadLinkedInResolver:
         query = urllib.parse.quote_plus(f"{company_keyword} {role_kw}")
         return f"https://www.linkedin.com/search/results/people/?keywords={query}"
 
+    def resolve_google_web_search(self, full_name: str, company_name: str, title: str) -> str:
+        """Generates Google Advanced Web Search query bypassing LinkedIn paywalls."""
+        company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', company_name)
+        company_clean = re.sub(r'[^a-zA-Z0-9\s]', '', company_clean).strip()
+        company_keyword = company_clean.split()[0] if company_clean else company_name.split()[0]
+        
+        role_kw = "Quality Assurance" if "quality" in title.lower() else ("Regulatory Affairs" if "regulatory" in title.lower() else title.split()[0])
+        
+        g_query = urllib.parse.quote_plus(f'site:linkedin.com/in/ "{company_keyword}" "{role_kw}"')
+        return f"https://www.google.com/search?q={g_query}"
+
 
 class PersonaContactEnricher:
     def __init__(self):
         self.linkedin_resolver = QuickLeadLinkedInResolver()
 
     def enrich_contacts_for_lead(self, domain: str, company_name: str, crawl_emails: List[str] = None) -> List[Dict[str, Any]]:
-        """Identifies target QA/RA decision-maker personas and generates verified work contacts with QuickLead LinkedIn profiles."""
+        """Identifies target QA/RA decision-maker personas and generates verified work contacts with QuickLead LinkedIn profiles and Web Search links."""
         contacts = []
         clean_domain = domain.lower().replace("https://", "").replace("http://", "").replace("www.", "").strip("/")
         company_clean = company_name.replace("Facilities", "").replace("Plant", "").replace("API", "").strip()
@@ -74,12 +85,14 @@ class PersonaContactEnricher:
                 title = "Quality Assurance & Compliance Lead" if idx == 0 else "Director of Regulatory Affairs"
                 
                 linkedin = self.linkedin_resolver.resolve_linkedin_profile(readable_name, company_clean, title)
+                web_search = self.linkedin_resolver.resolve_google_web_search(readable_name, company_clean, title)
                 
                 contacts.append({
                     "name": readable_name,
                     "title": title,
                     "email": email,
                     "linkedin_url": linkedin,
+                    "web_search_url": web_search,
                     "verification_status": "VERIFIED"
                 })
 
@@ -95,12 +108,14 @@ class PersonaContactEnricher:
             email = f"{pattern}@{clean_domain}"
             
             linkedin = self.linkedin_resolver.resolve_linkedin_profile(full_name, company_clean, persona["title_template"])
+            web_search = self.linkedin_resolver.resolve_google_web_search(full_name, company_clean, persona["title_template"])
             
             contacts.append({
                 "name": full_name,
                 "title": persona["title_template"],
                 "email": email,
                 "linkedin_url": linkedin,
+                "web_search_url": web_search,
                 "verification_status": "VERIFIED" if i == 0 else "CATCH_ALL"
             })
 

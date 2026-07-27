@@ -224,12 +224,20 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
                     "personalized_hook": s.personalized_hook
                 } for s in contact.sequences
             ]
+            company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', lead.name)
+            company_clean = re.sub(r'[^a-zA-Z0-9\s]', '', company_clean).strip()
+            company_kw = company_clean.split()[0] if company_clean else lead.name.split()[0]
+            role_kw = "Quality Assurance" if "quality" in contact.title.lower() else ("Regulatory Affairs" if "regulatory" in contact.title.lower() else contact.title.split()[0])
+            g_query = urllib.parse.quote_plus(f'site:linkedin.com/in/ "{company_kw}" "{role_kw}"')
+            web_search_url = f"https://www.google.com/search?q={g_query}"
+
             contacts_data.append({
                 "id": contact.id,
                 "name": contact.name,
                 "title": contact.title,
                 "email": contact.email,
                 "linkedin_url": contact.linkedin_url,
+                "web_search_url": web_search_url,
                 "verification_status": contact.verification_status,
                 "sequences": seqs_data
             })
