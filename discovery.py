@@ -64,30 +64,27 @@ class LeadDiscoveryEngine:
             "Accept": "application/json, text/plain, */*"
         }
 
-    async def _get_global_life_science_prospects(self, region: str, sector: str) -> List[Dict[str, Any]]:
+    async def _get_global_life_science_prospects(self, region: str, sector: str, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Curated database of high-value global Life Science & API producers."""
         catalog = [
-            # Middle East
             {"name": "Teva API Facilities", "domain": "tevaapi.com", "region": "Tel Aviv, Israel", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-800", "website_url": "https://tevaapi.com"},
             {"name": "Julphar Gulf Pharmaceutical", "domain": "julphar.net", "region": "Ras Al Khaimah, UAE", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-900", "website_url": "https://julphar.net"},
             {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"},
             {"name": "Dar Al Dawa Formulations", "domain": "dadgroup.com", "region": "Amman, Jordan", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "300-700", "website_url": "https://dadgroup.com"},
-            # Europe
             {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
             {"name": "Lonza Pharma & Biotech", "domain": "lonza.com", "region": "Basel, Switzerland", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://lonza.com"},
             {"name": "Oxford Biomedica", "domain": "oxb.com", "region": "Oxford, UK", "industry_subsector": "Biotechnology & Gene Therapy Developers", "employee_range": "200-500", "website_url": "https://oxb.com"},
             {"name": "Evotec AG", "domain": "evotec.com", "region": "Hamburg, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "400-800", "website_url": "https://evotec.com"},
             {"name": "Fresenius Kabi Formulations", "domain": "fresenius-kabi.com", "region": "Bad Homburg, Germany", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://fresenius-kabi.com"},
             {"name": "Hikma Formulations UK", "domain": "hikma.com", "region": "London, UK", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://hikma.com"},
-            # Asia-Pacific
             {"name": "Chugai Pharmaceutical", "domain": "chugai-pharm.co.jp", "region": "Tokyo, Japan", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://chugai-pharm.co.jp"},
             {"name": "Tessa Therapeutics", "domain": "tessatherapeutics.com", "region": "Singapore", "industry_subsector": "Biotechnology & Cell Therapy", "employee_range": "100-300", "website_url": "https://tessatherapeutics.com"},
             {"name": "SK Biotek", "domain": "skbiotek.com", "region": "Sejong, South Korea", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-600", "website_url": "https://skbiotek.com"}
         ]
-        return [p for p in catalog if is_region_match(region, p["region"])]
+        return [p for p in catalog if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
 
-    async def _discover_cdsco_indian_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def _discover_cdsco_indian_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries Indian CDSCO, SUGAM Portal & CTRI for active API, formulation & pharma producers."""
         indian_producers = [
             {"name": "Divis Laboratories API Division", "domain": "divislabs.com", "region": "Hyderabad, Telangana, India", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://divislabs.com"},
@@ -103,8 +100,7 @@ class LeadDiscoveryEngine:
             {"name": "TTK Healthcare MedTech", "domain": "ttkhealthcare.com", "region": "Chennai, Tamil Nadu, India", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "150-400", "website_url": "https://ttkhealthcare.com"}
         ]
         
-        # Filter for region and sector matching if specified
-        matched = [p for p in indian_producers if is_region_match(region, p["region"])]
+        matched = [p for p in indian_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
         if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
             matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
             if matched_sector:
@@ -112,9 +108,9 @@ class LeadDiscoveryEngine:
                 
         for m in matched:
             m["source"] = "CDSCO / SUGAM Portal (India)"
-        return matched[:limit] if matched else indian_producers[:limit]
+        return matched[:limit]
 
-    async def _discover_eudamed_mhra_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def _discover_eudamed_mhra_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries EUDAMED & UK MHRA registers for European device, formulation & API producers."""
         euro_producers = [
             {"name": "Sartorius Stedim Biotech", "domain": "sartorius.com", "region": "Göttingen, Germany", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500-1000", "website_url": "https://sartorius.com"},
@@ -126,7 +122,7 @@ class LeadDiscoveryEngine:
             {"name": "B. Braun Melsungen AG", "domain": "bbraun.com", "region": "Melsungen, Germany", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://bbraun.com"},
             {"name": "Smith & Nephew UK", "domain": "smith-nephew.com", "region": "London, UK", "industry_subsector": "Medical Devices & MedTech Producers", "employee_range": "500+", "website_url": "https://smith-nephew.com"}
         ]
-        matched = [p for p in euro_producers if is_region_match(region, p["region"])]
+        matched = [p for p in euro_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
         if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
             matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
             if matched_sector:
@@ -134,9 +130,9 @@ class LeadDiscoveryEngine:
 
         for e in matched:
             e["source"] = "EUDAMED / MHRA Register (Europe)"
-        return matched[:limit] if matched else euro_producers[:limit]
+        return matched[:limit]
 
-    async def _discover_who_pq_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def _discover_who_pq_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries WHO Prequalifications Directory for active global API & drug formulation producers."""
         who_producers = [
             {"name": "Teva API Facilities", "domain": "tevaapi.com", "region": "Tel Aviv, Israel", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-800", "website_url": "https://tevaapi.com"},
@@ -145,7 +141,7 @@ class LeadDiscoveryEngine:
             {"name": "Neopharm Life Sciences", "domain": "neopharm.co.il", "region": "Petah Tikva, Israel", "industry_subsector": "Biotechnology & API Developer", "employee_range": "150-400", "website_url": "https://neopharm.co.il"},
             {"name": "SPIMACO Addwaihya", "domain": "spimaco.com.sa", "region": "Riyadh, Saudi Arabia", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "500+", "website_url": "https://spimaco.com.sa"}
         ]
-        matched = [p for p in who_producers if is_region_match(region, p["region"])]
+        matched = [p for p in who_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
         if sector and ("formulation" in sector.lower() or "fdf" in sector.lower()):
             matched_sector = [p for p in matched if "formulation" in p["industry_subsector"].lower() or "fdf" in p["industry_subsector"].lower()]
             if matched_sector:
@@ -153,9 +149,9 @@ class LeadDiscoveryEngine:
 
         for w in matched:
             w["source"] = "WHO Prequalification Registry"
-        return matched[:limit] if matched else who_producers[:limit]
+        return matched[:limit]
 
-    async def _discover_fda_registered_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def _discover_fda_registered_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries openFDA establishment registrations matching target region."""
         leads = []
         try:
@@ -170,9 +166,9 @@ class LeadDiscoveryEngine:
             elif "uk" in reg_lower or "united kingdom" in reg_lower:
                 country_code = "GB"
 
-            url = f"https://api.fda.gov/device/registrationlisting.json?limit={limit * 3}"
+            url = f"https://api.fda.gov/device/registrationlisting.json?limit={limit * 4}"
             if country_code:
-                url = f"https://api.fda.gov/device/registrationlisting.json?search=iso_country_code:%22{country_code}%22&limit={limit * 3}"
+                url = f"https://api.fda.gov/device/registrationlisting.json?search=iso_country_code:%22{country_code}%22&limit={limit * 4}"
 
             async with httpx.AsyncClient(headers=self.headers, timeout=15.0) as client:
                 resp = await client.get(url)
@@ -185,9 +181,9 @@ class LeadDiscoveryEngine:
                         city = reg.get("city", "")
                         country = reg.get("iso_country_code", "US")
                         cand_region = f"{city}, {country}".strip(", ")
+                        clean_domain = re.sub(r'[^a-zA-Z0-9]', '', comp_name.lower()) + ".com" if comp_name else ""
                         
-                        if comp_name and is_region_match(region, cand_region):
-                            clean_domain = re.sub(r'[^a-zA-Z0-9]', '', comp_name.lower()) + ".com"
+                        if comp_name and clean_domain and is_region_match(region, cand_region) and (not exclude_domains or clean_domain not in exclude_domains):
                             leads.append({
                                 "name": comp_name.title(),
                                 "domain": clean_domain,
@@ -203,7 +199,7 @@ class LeadDiscoveryEngine:
             print(f"[Discovery] FDA Registry Notice: {e}")
         return leads
 
-    async def _discover_health_canada_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def _discover_health_canada_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries Health Canada MDALL & Drug Product open APIs."""
         leads = []
         try:
@@ -212,13 +208,13 @@ class LeadDiscoveryEngine:
                 resp = await client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
-                    for item in data[:limit * 3]:
+                    for item in data[:limit * 4]:
                         comp_name = item.get("company_name", "")
                         city = item.get("city", "")
                         prov = item.get("province", "Canada")
                         cand_region = f"{city}, {prov}, Canada".strip(", ")
-                        if comp_name and is_region_match(region, cand_region):
-                            clean_domain = re.sub(r'[^a-zA-Z0-9]', '', comp_name.lower()) + ".ca"
+                        clean_domain = re.sub(r'[^a-zA-Z0-9]', '', comp_name.lower()) + ".ca" if comp_name else ""
+                        if comp_name and clean_domain and is_region_match(region, cand_region) and (not exclude_domains or clean_domain not in exclude_domains):
                             leads.append({
                                 "name": comp_name.title(),
                                 "domain": clean_domain,
@@ -241,12 +237,12 @@ class LeadDiscoveryEngine:
             ]
             for c in canadian_producers:
                 c["source"] = "Health Canada MDALL & DPD Registry"
-            matched_can = [c for c in canadian_producers if is_region_match(region, c["region"])]
-            leads = matched_can if matched_can else canadian_producers
+            matched_can = [c for c in canadian_producers if is_region_match(region, c["region"]) and (not exclude_domains or c["domain"] not in exclude_domains)]
+            leads = matched_can if matched_can else [c for c in canadian_producers if not exclude_domains or c["domain"] not in exclude_domains]
 
         return leads[:limit]
 
-    async def _discover_latam_anvisa_facilities(self, region: str, sector: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def _discover_latam_anvisa_facilities(self, region: str, sector: str, limit: int = 10, exclude_domains: set = None) -> List[Dict[str, Any]]:
         """Queries Latin American ANVISA & COFEPRIS Life Science & API producer registers."""
         latam_producers = [
             {"name": "EMS Pharma Formulations", "domain": "ems.com.br", "region": "São Paulo, Brazil", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "500+", "website_url": "https://ems.com.br"},
@@ -254,59 +250,60 @@ class LeadDiscoveryEngine:
             {"name": "Laboratorios Bagó", "domain": "bago.com.ar", "region": "Buenos Aires, Argentina", "industry_subsector": "Pharmaceutical Formulations & Finished Dosage (FDF)", "employee_range": "400-900", "website_url": "https://bago.com.ar"},
             {"name": "Silanes Pharmaceuticals", "domain": "silanes.com.mx", "region": "Mexico City, Mexico", "industry_subsector": "Active Pharmaceutical Ingredients (API)", "employee_range": "300-600", "website_url": "https://silanes.com.mx"}
         ]
-        matched = [p for p in latam_producers if is_region_match(region, p["region"])]
+        matched = [p for p in latam_producers if is_region_match(region, p["region"]) and (not exclude_domains or p["domain"] not in exclude_domains)]
         for l in matched:
             l["source"] = "ANVISA & LATAM Regulatory Register"
-        return matched[:limit] if matched else latam_producers[:limit]
+        return matched[:limit]
 
     async def discover_leads(
         self, 
         target_region: str, 
         target_sector: str, 
         max_results: int = 10,
-        selected_sources: List[str] = None
+        selected_sources: List[str] = None,
+        exclude_domains: set = None
     ) -> List[Dict[str, Any]]:
-        """Aggregates leads based on user-selected regulatory API data sources and regional targets."""
+        """Aggregates leads based on user-selected regulatory API data sources and regional targets, enforcing cross-campaign uniqueness."""
         if not selected_sources:
             selected_sources = ["ALL"]
 
+        seen_domains = set(exclude_domains) if exclude_domains else set()
         combined = []
 
         # 0. Global Curated & Industry Registry Catalog
-        curated_leads = await self._get_global_life_science_prospects(target_region, target_sector)
+        curated_leads = await self._get_global_life_science_prospects(target_region, target_sector, exclude_domains=seen_domains)
         combined.extend(curated_leads)
 
         # 1. CDSCO / SUGAM Portal (India)
         if "CDSCO" in selected_sources or "ALL" in selected_sources or "india" in target_region.lower():
-            cdsco_leads = await self._discover_cdsco_indian_facilities(target_region, target_sector, limit=max_results)
+            cdsco_leads = await self._discover_cdsco_indian_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
             combined.extend(cdsco_leads)
 
         # 2. EUDAMED & MHRA (Europe & UK)
         if "EUDAMED" in selected_sources or "ALL" in selected_sources or "europe" in target_region.lower():
-            euro_leads = await self._discover_eudamed_mhra_facilities(target_region, target_sector, limit=max_results)
+            euro_leads = await self._discover_eudamed_mhra_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
             combined.extend(euro_leads)
 
         # 3. WHO Prequalification & Global Sponsors
         if "WHO" in selected_sources or "ALL" in selected_sources or "middle east" in target_region.lower():
-            who_leads = await self._discover_who_pq_facilities(target_region, target_sector, limit=max_results)
+            who_leads = await self._discover_who_pq_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
             combined.extend(who_leads)
 
         # 4. openFDA (US & Global Export Facilities)
         if "FDA" in selected_sources or "ALL" in selected_sources:
-            fda_leads = await self._discover_fda_registered_facilities(target_region, target_sector, limit=max_results)
+            fda_leads = await self._discover_fda_registered_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
             combined.extend(fda_leads)
 
         # 5. Health Canada API (Canada)
         if "HEALTH_CANADA" in selected_sources or "ALL" in selected_sources or "canada" in target_region.lower():
-            hc_leads = await self._discover_health_canada_facilities(target_region, target_sector, limit=max_results)
+            hc_leads = await self._discover_health_canada_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
             combined.extend(hc_leads)
 
         # 6. LATAM ANVISA Registry (South America)
         if "ANVISA" in selected_sources or "ALL" in selected_sources or "south america" in target_region.lower() or "brazil" in target_region.lower():
-            latam_leads = await self._discover_latam_anvisa_facilities(target_region, target_sector, limit=max_results)
+            latam_leads = await self._discover_latam_anvisa_facilities(target_region, target_sector, limit=max_results, exclude_domains=seen_domains)
             combined.extend(latam_leads)
 
-        seen_domains = set()
         unique_leads = []
 
         # Strict regional check loop

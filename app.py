@@ -45,14 +45,18 @@ async def background_sdr_worker():
                     db.commit()
                     campaign_id = campaign.id
                     
+                    # Fetch all previously saved lead domains across ALL campaigns in the DB to enforce cross-run uniqueness
+                    existing_domains = {lead.domain for lead in db.query(CompanyLead.domain).all()}
+                    
                     try:
-                        # 1. Discover Leads across Selected Regulatory Registries
+                        # 1. Discover Leads across Selected Regulatory Registries (excluding previously fetched domains)
                         sel_sources = json.loads(campaign.selected_sources) if campaign.selected_sources else ["ALL"]
                         raw_leads = await discovery_engine.discover_leads(
                             target_region=campaign.target_region,
                             target_sector=campaign.target_sector,
                             max_results=campaign.total_expected,
-                            selected_sources=sel_sources
+                            selected_sources=sel_sources,
+                            exclude_domains=existing_domains
                         )
                         
                         processed_count = 0

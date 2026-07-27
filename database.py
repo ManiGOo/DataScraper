@@ -18,21 +18,22 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
 
 is_postgres = DATABASE_URL.startswith("postgresql")
 
-# Ensure PostgreSQL schema exists before creating tables
+# Verify PostgreSQL connection; fallback to SQLite if unreachable
 if is_postgres:
     try:
         raw_dsn = re.sub(r'^postgresql\+?[^:]*://', 'postgresql://', DATABASE_URL)
-        conn = psycopg2.connect(raw_dsn)
+        conn = psycopg2.connect(raw_dsn, connect_timeout=3)
         cur = conn.cursor()
         cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB_SCHEMA};")
         conn.commit()
         cur.close()
         conn.close()
-        print(f"[Database] Verified/Created schema '{DB_SCHEMA}' in PostgreSQL.")
+        print(f"[Database] Connected to PostgreSQL. Verified schema '{DB_SCHEMA}'.")
     except Exception as e:
-        print(f"[Database Schema Notice] {e}")
+        print(f"[Database Notice] PostgreSQL remote unavailable ({e}). Falling back to local SQLite app.db.")
+        DATABASE_URL = "sqlite:///./app.db"
+        is_postgres = False
 
-# Configure SQLAlchemy Engine
 connect_args = {}
 if is_postgres:
     connect_args["options"] = f"-c search_path={DB_SCHEMA},public"
@@ -138,7 +139,10 @@ class OutreachSequence(Base):
     contact = relationship("QualifiedContact", back_populates="sequences")
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"[init_db Notice] {e}")
 
 def get_db():
     db = SessionLocal()
