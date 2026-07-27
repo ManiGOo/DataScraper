@@ -1,19 +1,43 @@
 import os
+import re
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+import psycopg2
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://pharmabkp:aivoadma25@216.48.184.249:5432/pharma")
+DB_SCHEMA = os.getenv("DB_SCHEMA", "ai_sdr")
 
-if not DATABASE_URL:
-    DATABASE_URL = "sqlite:///./app.db"
+# Standardize database driver URI for SQLAlchemy
+if DATABASE_URL.startswith("postgresql+asyncpg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
-# Create SQLAlchemy Engine (sqlite thread-safe args if sqlite)
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+is_postgres = DATABASE_URL.startswith("postgresql")
+
+# Ensure PostgreSQL schema exists before creating tables
+if is_postgres:
+    try:
+        raw_dsn = re.sub(r'^postgresql\+?[^:]*://', 'postgresql://', DATABASE_URL)
+        conn = psycopg2.connect(raw_dsn)
+        cur = conn.cursor()
+        cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB_SCHEMA};")
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"[Database] Verified/Created schema '{DB_SCHEMA}' in PostgreSQL.")
+    except Exception as e:
+        print(f"[Database Schema Notice] {e}")
+
+# Configure SQLAlchemy Engine
+connect_args = {}
+if is_postgres:
+    connect_args["options"] = f"-c search_path={DB_SCHEMA},public"
+else:
+    connect_args["check_same_thread"] = False
 
 engine = create_engine(
     DATABASE_URL, 
@@ -22,7 +46,9 @@ engine = create_engine(
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+
+metadata = MetaData(schema=DB_SCHEMA) if is_postgres else None
+Base = declarative_base(metadata=metadata)
 
 class User(Base):
     __tablename__ = "users"
@@ -39,7 +65,7 @@ class UserQuery(Base):
     __tablename__ = "user_queries"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.users.id" if is_postgres else "users.id", ondelete="CASCADE"), nullable=False)
     query = Column(Text, nullable=False)
     max_results = Column(Integer, default=10)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -50,13 +76,13 @@ class SdrCampaign(Base):
     __tablename__ = "sdr_campaigns"
 
     id = Column(String(36), primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.users.id" if is_postgres else "users.id", ondelete="CASCADE"), nullable=True)
     target_region = Column(String(255), nullable=False)
-    target_sector = Column(String(255), nullable=False) # MedTech, Biotech, Pharma, General Life Science
+    target_sector = Column(String(255), nullable=False)
     status = Column(String(50), default="PENDING")
     progress = Column(Integer, default=0)
     total_expected = Column(Integer, default=10)
-    selected_sources = Column(Text, nullable=True) # JSON list e.g. ["CDSCO", "FDA"]
+    selected_sources = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -67,14 +93,14 @@ class CompanyLead(Base):
     __tablename__ = "company_leads"
 
     id = Column(Integer, primary_key=True, index=True)
-    campaign_id = Column(String(36), ForeignKey("sdr_campaigns.id", ondelete="CASCADE"), nullable=True)
+    campaign_id = Column(String(36), ForeignKey(f"{DB_SCHEMA}.sdr_campaigns.id" if is_postgres else "sdr_campaigns.id", ondelete="CASCADE"), nullable=True)
     domain = Column(String(255), index=True, nullable=False)
     name = Column(String(255), nullable=False)
     region = Column(String(255), nullable=True)
     industry_subsector = Column(String(100), nullable=True)
     employee_range = Column(String(100), nullable=True)
-    qms_fit_score = Column(Integer, default=0) # 1 to 100
-    compliance_drivers = Column(Text, nullable=True) # e.g., JSON list ["ISO 13485", "21 CFR Part 11"]
+    qms_fit_score = Column(Integer, default=0)
+    compliance_drivers = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
     website_url = Column(Text, nullable=True)
     source = Column(String(100), default="Regulatory Scanner")
@@ -87,12 +113,12 @@ class QualifiedContact(Base):
     __tablename__ = "qualified_contacts"
 
     id = Column(Integer, primary_key=True, index=True)
-    company_id = Column(Integer, ForeignKey("company_leads.id", ondelete="CASCADE"), nullable=False)
+    company_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.company_leads.id" if is_postgres else "company_leads.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     title = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     linkedin_url = Column(Text, nullable=True)
-    verification_status = Column(String(50), default="UNVERIFIED") # VERIFIED, CATCH_ALL, UNVERIFIED
+    verification_status = Column(String(50), default="UNVERIFIED")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     company = relationship("CompanyLead", back_populates="contacts")
@@ -102,8 +128,8 @@ class OutreachSequence(Base):
     __tablename__ = "outreach_sequences"
 
     id = Column(Integer, primary_key=True, index=True)
-    contact_id = Column(Integer, ForeignKey("qualified_contacts.id", ondelete="CASCADE"), nullable=False)
-    step_number = Column(Integer, default=1) # 1, 2, 3
+    contact_id = Column(Integer, ForeignKey(f"{DB_SCHEMA}.qualified_contacts.id" if is_postgres else "qualified_contacts.id", ondelete="CASCADE"), nullable=False)
+    step_number = Column(Integer, default=1)
     subject = Column(String(255), nullable=False)
     body_text = Column(Text, nullable=False)
     personalized_hook = Column(Text, nullable=True)
