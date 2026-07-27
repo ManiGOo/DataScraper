@@ -95,6 +95,7 @@ class CompanyLead(Base):
     summary = Column(Text, nullable=True)
     website_url = Column(Text, nullable=True)
     source = Column(String(100), default="Regulatory Scanner")
+    social_links = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     campaign = relationship("SdrCampaign", back_populates="company_leads")

@@ -20,6 +20,7 @@ from database import (
 )
 from discovery import LeadDiscoveryEngine
 from crawler import DomainCrawler
+from site_crawler import CompanyWebsiteCrawler
 from ai_classifier import AIProspectClassifier
 from enrichment import PersonaContactEnricher
 from outreach_generator import OutreachCopyGenerator
@@ -30,6 +31,7 @@ init_db()
 # Instantiate modules
 discovery_engine = LeadDiscoveryEngine()
 domain_crawler = DomainCrawler()
+site_crawler = CompanyWebsiteCrawler()
 ai_classifier = AIProspectClassifier()
 contact_enricher = PersonaContactEnricher()
 copy_generator = OutreachCopyGenerator()
@@ -74,11 +76,13 @@ async def background_sdr_worker():
                             if lead_item["domain"] in processed_domains:
                                 continue
                             processed_domains.add(lead_item["domain"])
-                            # 2. Crawl Company Domain for QMS keywords
-                            crawl_data = await domain_crawler.crawl_domain(
+                            # 2. Deep Crawl Company Domain for QMS signals & Social Footprint
+                            site_crawl = await site_crawler.crawl_site(lead_item["domain"], lead_item["name"])
+                            domain_crawl = await domain_crawler.crawl_domain(
                                 domain=lead_item["domain"],
                                 base_url=lead_item.get("website_url")
                             )
+                            crawl_data = {**domain_crawl, "emails_found": list(set(domain_crawl.get("emails_found", []) + site_crawl.get("emails_found", [])))}
                             
                             # 3. AI Qualification & QMS Fit Scoring
                             ai_qual = await ai_classifier.qualify_lead(lead_item, crawl_data)
@@ -95,7 +99,8 @@ async def background_sdr_worker():
                                 compliance_drivers=json.dumps(ai_qual["compliance_drivers"]),
                                 summary=ai_qual["summary"],
                                 website_url=lead_item.get("website_url"),
-                                source=lead_item.get("source", "Regulatory Scanner")
+                                source=lead_item.get("source", "Regulatory Scanner"),
+                                social_links=json.dumps(site_crawl["social_links"])
                             )
                             db.add(company_lead)
                             db.flush() # get company_lead.id
@@ -248,6 +253,13 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
                 "sequences": seqs_data
             })
             
+        social_links_data = {}
+        if lead.social_links:
+            try:
+                social_links_data = json.loads(lead.social_links)
+            except Exception:
+                pass
+
         lead_results.append({
             "id": lead.id,
             "name": lead.name,
@@ -260,6 +272,7 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
             "summary": lead.summary,
             "website_url": lead.website_url,
             "source": lead.source,
+            "social_links": social_links_data,
             "contacts": contacts_data
         })
 
