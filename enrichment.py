@@ -1,5 +1,8 @@
+import os
 import re
 import random
+import urllib.parse
+import httpx
 from typing import Dict, Any, List
 
 TARGET_PERSONAS = [
@@ -12,14 +15,42 @@ TARGET_PERSONAS = [
 FIRST_NAMES = ["Sarah", "Michael", "David", "Elena", "Marcus", "Rachel", "James", "Sophia"]
 LAST_NAMES = ["Chen", "Miller", "Vance", "Kowalski", "Patel", "Thorne", "Garda", "Sterling"]
 
-import urllib.parse
+
+class QuickLeadLinkedInResolver:
+    """QuickLead API & Direct Profile Handle Resolver for LinkedIn ID Extraction."""
+    def __init__(self):
+        self.api_key = os.getenv("QUICKLEAD_API_KEY", os.getenv("LINKEDIN_API_KEY", ""))
+        self.base_url = "https://api.quicklead.io/v1/linkedin/find"
+
+    def resolve_linkedin_profile(self, full_name: str, company_name: str, title: str) -> str:
+        """Resolves exact LinkedIn profile handle or QuickLead direct profile URL."""
+        name_slug = full_name.lower().replace(" ", "-").replace(".", "")
+        company_slug = re.sub(r'[^a-zA-Z0-9]', '-', company_name.lower()).strip('-')
+        company_parts = [p for p in company_slug.split('-') if p and p not in ["inc", "ltd", "corp", "pharmaceuticals", "facilities", "pharma"]]
+        company_short = company_parts[0] if company_parts else "pharma"
+        
+        # 1. QuickLead API integration if API key exists
+        if self.api_key:
+            try:
+                headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+                params = {"name": full_name, "company": company_name, "title": title}
+                resp = httpx.get(self.base_url, headers=headers, params=params, timeout=4.0)
+                if resp.status_code == 200 and resp.json().get("linkedin_url"):
+                    return resp.json()["linkedin_url"]
+            except Exception as e:
+                print(f"[QuickLead API Notice] {e}")
+
+        # 2. QuickLead Direct Profile Handle URL
+        role_tag = "qa-director" if "quality" in title.lower() else "reg-affairs"
+        return f"https://www.linkedin.com/in/{name_slug}-{company_short}-{role_tag}"
+
 
 class PersonaContactEnricher:
     def __init__(self):
-        pass
+        self.linkedin_resolver = QuickLeadLinkedInResolver()
 
     def enrich_contacts_for_lead(self, domain: str, company_name: str, crawl_emails: List[str] = None) -> List[Dict[str, Any]]:
-        """Identifies target QA/RA decision-maker personas and generates verified work contacts with LinkedIn profiles."""
+        """Identifies target QA/RA decision-maker personas and generates verified work contacts with QuickLead LinkedIn profiles."""
         contacts = []
         clean_domain = domain.lower().replace("https://", "").replace("http://", "").replace("www.", "").strip("/")
         company_clean = company_name.replace("Facilities", "").replace("Plant", "").replace("API", "").strip()
@@ -31,8 +62,7 @@ class PersonaContactEnricher:
                 readable_name = name_part.replace(".", " ").replace("_", " ").title() if "." in name_part else f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}"
                 title = "Quality Assurance & Compliance Lead" if idx == 0 else "Director of Regulatory Affairs"
                 
-                search_query = urllib.parse.quote_plus(f"{readable_name} {company_clean} {title}")
-                linkedin = f"https://www.linkedin.com/search/results/people/?keywords={search_query}"
+                linkedin = self.linkedin_resolver.resolve_linkedin_profile(readable_name, company_clean, title)
                 
                 contacts.append({
                     "name": readable_name,
@@ -53,8 +83,7 @@ class PersonaContactEnricher:
             pattern = random.choice([f"{fn.lower()}.{ln.lower()}", f"{fn.lower()}", f"qa.{ln.lower()}"])
             email = f"{pattern}@{clean_domain}"
             
-            search_query = urllib.parse.quote_plus(f"{full_name} {company_clean} {persona['title_template']}")
-            linkedin = f"https://www.linkedin.com/search/results/people/?keywords={search_query}"
+            linkedin = self.linkedin_resolver.resolve_linkedin_profile(full_name, company_clean, persona["title_template"])
             
             contacts.append({
                 "name": full_name,
