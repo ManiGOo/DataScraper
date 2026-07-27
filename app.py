@@ -104,7 +104,8 @@ async def background_sdr_worker():
                             enriched_contacts = contact_enricher.enrich_contacts_for_lead(
                                 domain=lead_item["domain"],
                                 company_name=lead_item["name"],
-                                crawl_emails=crawl_data.get("emails_found")
+                                crawl_emails=crawl_data.get("emails_found"),
+                                location_address=lead_item["region"]
                             )
                             
                             for c_data in enriched_contacts:
@@ -227,8 +228,12 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
             company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', lead.name)
             company_clean = re.sub(r'[^a-zA-Z0-9\s]', '', company_clean).strip()
             company_kw = company_clean.split()[0] if company_clean else lead.name.split()[0]
+            city_token = lead.region.split(',')[0].strip() if lead.region else ""
             role_kw = "Quality Assurance" if "quality" in contact.title.lower() else ("Regulatory Affairs" if "regulatory" in contact.title.lower() else contact.title.split()[0])
-            g_query = urllib.parse.quote_plus(f'site:linkedin.com/in/ "{company_kw}" "{role_kw}"')
+            g_parts = [f'"{contact.name}"', f'"{company_kw}"', f'"{role_kw}"']
+            if city_token:
+                g_parts.append(f'"{city_token}"')
+            g_query = urllib.parse.quote_plus(" ".join(g_parts))
             web_search_url = f"https://www.google.com/search?q={g_query}"
 
             contacts_data.append({
