@@ -198,13 +198,14 @@ def read_root():
 def start_campaign(req: StartCampaignRequest, db: Session = Depends(get_db)):
     campaign_id = str(uuid.uuid4())
     sources = req.selected_sources if req.selected_sources else ["ALL"]
+    max_count = req.max_results if req.max_results and req.max_results > 0 else 5
     campaign = SdrCampaign(
         id=campaign_id,
         target_region=req.target_region,
         target_sector=req.target_sector,
         status="PENDING",
         progress=0,
-        total_expected=req.max_results,
+        total_expected=max_count,
         selected_sources=json.dumps(sources)
     )
     db.add(campaign)

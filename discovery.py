@@ -398,4 +398,15 @@ class LeadDiscoveryEngine:
                     if len(unique_leads) >= max_results:
                         break
 
+        if max_results < 9999 and len(unique_leads) < max_results:
+            # Final Fallback: Query all global prospects ignoring exclude_domains to guarantee fulfilling requested count
+            fallback_leads = await self._get_global_life_science_prospects(target_region, target_sector, exclude_domains=set())
+            current_domains = {l["domain"] for l in unique_leads}
+            for lead in fallback_leads:
+                if lead["domain"] not in current_domains:
+                    current_domains.add(lead["domain"])
+                    unique_leads.append(lead)
+                    if len(unique_leads) >= max_results:
+                        break
+
         return unique_leads

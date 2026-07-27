@@ -105,7 +105,8 @@ function setPreset(region) {
 async function startSdrCampaign() {
     const region = document.getElementById('targetRegion').value.trim();
     const sector = document.getElementById('targetSector').value;
-    const maxProspects = parseInt(document.getElementById('maxProspects').value);
+    const maxVal = parseInt(document.getElementById('maxProspects').value, 10);
+    const maxProspects = (!isNaN(maxVal) && maxVal > 0) ? maxVal : 5;
 
     if (!region) {
         alert("Please specify a target region.");
@@ -177,14 +178,21 @@ async function checkCampaignStatus() {
         const progressTitle = document.getElementById('progressTitle');
 
         let pct = 0;
-        if (data.total_expected > 0) {
-            pct = Math.min(100, Math.floor((data.progress / data.total_expected) * 100));
+        const displayTotal = (data.total_expected && data.total_expected > 0) ? data.total_expected : (currentLeadsData.length || 5);
+        if (displayTotal > 0) {
+            pct = Math.min(100, Math.floor(((data.progress || currentLeadsData.length) / displayTotal) * 100));
         }
+
+        if (data.status === 'COMPLETED') pct = 100;
 
         progressBar.style.width = `${pct}%`;
         progressPercent.innerText = `${pct}%`;
 
-        terminalLog.innerHTML = `<div>> Status: ${data.status} | Qualified: ${data.progress} / ${data.total_expected} prospects</div>`;
+        let logHtml = `<div>> Status: ${data.status} | Qualified: ${data.progress || currentLeadsData.length} / ${displayTotal} prospects</div>`;
+        if (data.error_message) {
+            logHtml += `<div style="color:#fde047; font-size:0.8rem; margin-top:0.3rem;">💡 ${data.error_message}</div>`;
+        }
+        terminalLog.innerHTML = logHtml;
 
         if (data.status === 'RUNNING') {
             progressTitle.innerText = "Mining Registries & AI Scoring Prospects...";
