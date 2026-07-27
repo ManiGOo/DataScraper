@@ -532,16 +532,58 @@
             filterRecords();
         }
 
+        function isRegionMatch(activeReg, leadRegion) {
+            if (!activeReg || activeReg === 'ALL') return true;
+            if (!leadRegion) return false;
+            
+            const regLower = leadRegion.toLowerCase();
+            const activeLower = activeReg.toLowerCase();
+            
+            if (regLower.includes(activeLower)) return true;
+
+            if (activeLower.includes('middle east')) {
+                return regLower.includes('israel') || regLower.includes('uae') || regLower.includes('saudi') || 
+                       regLower.includes('jordan') || regLower.includes('dubai') || regLower.includes('tel aviv') || 
+                       regLower.includes('ras al khaimah') || regLower.includes('petah tikva') || regLower.includes('riyadh') || 
+                       regLower.includes('amman');
+            }
+            if (activeLower.includes('europe')) {
+                return regLower.includes('germany') || regLower.includes('uk') || regLower.includes('switzerland') || 
+                       regLower.includes('france') || regLower.includes('italy') || regLower.includes('london') || 
+                       regLower.includes('basel') || regLower.includes('göttingen') || regLower.includes('hamburg') || 
+                       regLower.includes('melsungen') || regLower.includes('oxford');
+            }
+            if (activeLower.includes('india')) {
+                return regLower.includes('india') || regLower.includes('in') || regLower.includes('hyderabad') || 
+                       regLower.includes('gujarat') || regLower.includes('mumbai') || regLower.includes('delhi') || 
+                       regLower.includes('noida') || regLower.includes('chennai') || regLower.includes('vadodara') || 
+                       regLower.includes('telangana') || regLower.includes('maharashtra');
+            }
+            if (activeLower.includes('north america') || activeLower.includes('usa') || activeLower.includes('canada')) {
+                return regLower.includes('usa') || regLower.includes('canada') || regLower.includes('ontario') || 
+                       regLower.includes('quebec') || regLower.includes('vancouver') || regLower.includes('toronto') || 
+                       regLower.includes('montreal') || regLower.includes('massachusetts') || regLower.includes('boston') || 
+                       regLower.includes('us') || regLower.includes('ca');
+            }
+            if (activeLower.includes('south america') || activeLower.includes('brazil')) {
+                return regLower.includes('brazil') || regLower.includes('argentina') || regLower.includes('mexico') || 
+                       regLower.includes('são paulo') || regLower.includes('buenos aires') || regLower.includes('mexico city');
+            }
+            if (activeLower.includes('asia-pacific') || activeLower.includes('japan')) {
+                return regLower.includes('japan') || regLower.includes('singapore') || regLower.includes('south korea') || 
+                       regLower.includes('tokyo') || regLower.includes('sejong');
+            }
+            return false;
+        }
+
         function filterRecords() {
             const search = document.getElementById('searchInput').value.toLowerCase().trim();
             const sector = document.getElementById('sectorFilter').value;
 
             const filtered = allLeads.filter(lead => {
-                // Region filter
-                if (activeRegion !== 'ALL') {
-                    const regLower = lead.region ? lead.region.toLowerCase() : '';
-                    const matchReg = activeRegion.toLowerCase();
-                    if (!regLower.includes(matchReg)) return false;
+                // Region filter using smart token matching
+                if (!isRegionMatch(activeRegion, lead.region)) {
+                    return false;
                 }
                 // Sector filter
                 if (sector !== 'ALL') {
