@@ -1,21 +1,20 @@
 import httpx
 import re
 import asyncio
-from typing import Dict, Any, List, Set
 import urllib.parse
 from urllib.parse import urljoin
+from typing import Dict, Any, List, Set
+from playwright.async_api import async_playwright
 
 class CompanyWebsiteCrawler:
-    """Async Deep Website Crawler extracting Social Links (LinkedIn, X, Instagram, Facebook, YouTube), Contact Emails & Phone Numbers."""
+    """Headless Playwright & Async Web Crawler extracting Social Links (LinkedIn, X, Instagram, Facebook, YouTube), Contact Emails & Phone Numbers from JS-rendered websites."""
     
-    def __init__(self, timeout: float = 6.0):
+    def __init__(self, timeout: float = 10.0):
         self.timeout = timeout
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
+        self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
     async def crawl_site(self, domain: str, company_name: str = "") -> Dict[str, Any]:
-        """Crawls homepage and subpages (/contact, /about, /leadership, /team) to extract social links, emails & phones."""
+        """Crawls homepage and subpages (/contact, /about, /leadership, /team) via Playwright Headless Browser with JS execution."""
         clean_domain = domain.lower().replace("https://", "").replace("http://", "").replace("www.", "").strip("/")
         base_url = f"https://{clean_domain}"
 
@@ -47,14 +46,39 @@ class CompanyWebsiteCrawler:
         seen_phones: Set[str] = set()
         seen_leadership: Set[str] = set()
 
-        try:
-            async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout, follow_redirects=True, verify=False) as client:
-                tasks = [self._fetch_page(client, url) for url in pages_to_crawl]
-                pages_html = await asyncio.gather(*tasks)
-        except Exception as e:
-            print(f"[Site Crawler Error] {e}")
-            pages_html = []
+        pages_html = []
 
+        # 1. Primary Engine: Playwright Headless Browser (DOM & JavaScript Rendered)
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(user_agent=self.user_agent, ignore_https_errors=True)
+                page = await context.new_page()
+
+                for url in pages_to_crawl:
+                    try:
+                        resp = await page.goto(url, timeout=int(self.timeout * 1000), wait_until="domcontentloaded")
+                        if resp and resp.status == 200:
+                            content = await page.content()
+                            pages_html.append(content)
+                    except Exception:
+                        continue
+
+                await browser.close()
+        except Exception as pw_err:
+            print(f"[Site Crawler] Playwright Notice: {pw_err}. Falling back to httpx...")
+
+        # 2. Fallback Engine: httpx Async HTTP Client
+        if not pages_html:
+            try:
+                headers = {"User-Agent": self.user_agent}
+                async with httpx.AsyncClient(headers=headers, timeout=self.timeout, follow_redirects=True, verify=False) as client:
+                    tasks = [self._fetch_httpx_page(client, url) for url in pages_to_crawl]
+                    pages_html = await asyncio.gather(*tasks)
+            except Exception as httpx_err:
+                print(f"[Site Crawler] httpx Notice: {httpx_err}")
+
+        # Parse extracted DOM HTML content across crawled pages
         for html in pages_html:
             if not html:
                 continue
@@ -113,7 +137,7 @@ class CompanyWebsiteCrawler:
         result["phones_found"] = list(seen_phones)[:3]
         result["leadership_links"] = list(seen_leadership)[:3]
 
-        # Smart Fallback Generator if missing from direct site HTML
+        # Smart Search Generator fallback for missing social links
         company_kw = clean_domain.split('.')[0].capitalize()
         if company_name:
             company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', company_name)
@@ -135,7 +159,7 @@ class CompanyWebsiteCrawler:
 
         return result
 
-    async def _fetch_page(self, client: httpx.AsyncClient, url: str) -> str:
+    async def _fetch_httpx_page(self, client: httpx.AsyncClient, url: str) -> str:
         try:
             resp = await client.get(url)
             if resp.status_code == 200:
