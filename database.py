@@ -2,7 +2,7 @@ import os
 import re
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, MetaData
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, MetaData, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import psycopg2
@@ -96,6 +96,9 @@ class CompanyLead(Base):
     website_url = Column(Text, nullable=True)
     source = Column(String(100), default="Regulatory Scanner")
     social_links = Column(Text, nullable=True)
+    is_sme = Column(Boolean, default=True)
+    estimated_revenue = Column(String(100), nullable=True)
+    source_directory = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     campaign = relationship("SdrCampaign", back_populates="company_leads")
@@ -109,6 +112,7 @@ class QualifiedContact(Base):
     name = Column(String(255), nullable=False)
     title = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
+    phone = Column(String(100), nullable=True)
     linkedin_url = Column(Text, nullable=True)
     verification_status = Column(String(50), default="UNVERIFIED")
     created_at = Column(DateTime, default=datetime.utcnow)

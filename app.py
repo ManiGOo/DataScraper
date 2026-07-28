@@ -20,7 +20,7 @@ from database import (
     init_db, get_db, SessionLocal, User, UserQuery, 
     SdrCampaign, CompanyLead, QualifiedContact, OutreachSequence
 )
-from discovery import LeadDiscoveryEngine
+from scrapers.orchestrator import DiscoveryOrchestrator
 from crawler import DomainCrawler
 from site_crawler import CompanyWebsiteCrawler
 from ai_classifier import AIProspectClassifier
@@ -31,7 +31,7 @@ from outreach_generator import OutreachCopyGenerator
 init_db()
 
 # Instantiate modules
-discovery_engine = LeadDiscoveryEngine()
+discovery_engine = DiscoveryOrchestrator()
 domain_crawler = DomainCrawler()
 site_crawler = CompanyWebsiteCrawler()
 ai_classifier = AIProspectClassifier()
@@ -75,13 +75,25 @@ async def background_sdr_worker():
                             if lead_item["domain"] in processed_domains:
                                 continue
                             processed_domains.add(lead_item["domain"])
-                            # 2. Deep Crawl Company Domain for QMS signals & Social Footprint
+                            # 2. Deep Crawl Company Domain for QMS signals, Real Emails & Social Footprint
+                            from scrapers.page_scraper import DeepWebsiteScraper
+                            deep_scraper = DeepWebsiteScraper()
+                            scraped_data = await deep_scraper.scrape(lead_item["domain"])
+                            
                             site_crawl = await site_crawler.crawl_site(lead_item["domain"], lead_item["name"])
                             domain_crawl = await domain_crawler.crawl_domain(
                                 domain=lead_item["domain"],
                                 base_url=lead_item.get("website_url")
                             )
-                            crawl_data = {**domain_crawl, "emails_found": list(set(domain_crawl.get("emails_found", []) + site_crawl.get("emails_found", [])))}
+                            
+                            # Merge deep scraped emails/phones over the standard crawler data
+                            crawl_data = {
+                                **domain_crawl, 
+                                "emails_found": scraped_data["emails"],
+                                "phones_found": scraped_data["phones"]
+                            }
+                            # Update social links with explicit scraped ones
+                            site_crawl["social_links"] = scraped_data["socials"]
                             
                             # 3. AI Qualification & QMS Fit Scoring
                             ai_qual = await ai_classifier.qualify_lead(lead_item, crawl_data)
@@ -91,7 +103,7 @@ async def background_sdr_worker():
                                 campaign_id=campaign_id,
                                 domain=lead_item["domain"],
                                 name=lead_item["name"],
-                                region=lead_item.get("region", campaign.target_region),
+                                region=ai_qual.get("exact_location") or lead_item.get("region", campaign.target_region),
                                 industry_subsector=lead_item.get("industry_subsector", campaign.target_sector),
                                 employee_range=lead_item.get("employee_range", "50-200"),
                                 qms_fit_score=ai_qual["qms_fit_score"],
@@ -99,7 +111,10 @@ async def background_sdr_worker():
                                 summary=ai_qual["summary"],
                                 website_url=lead_item.get("website_url"),
                                 source=lead_item.get("source", "Regulatory Scanner"),
-                                social_links=json.dumps(site_crawl["social_links"])
+                                social_links=json.dumps(site_crawl["social_links"]),
+                                is_sme=lead_item.get("is_sme", True),
+                                estimated_revenue=lead_item.get("estimated_revenue"),
+                                source_directory=lead_item.get("source_directory")
                             )
                             db.add(company_lead)
                             db.flush() # get company_lead.id
@@ -109,7 +124,8 @@ async def background_sdr_worker():
                                 domain=lead_item["domain"],
                                 company_name=lead_item["name"],
                                 crawl_emails=crawl_data.get("emails_found"),
-                                location_address=lead_item["region"]
+                                crawl_phones=crawl_data.get("phones_found"),
+                                location_address=lead_item.get("region", campaign.target_region)
                             )
                             
                             for c_data in enriched_contacts:
@@ -118,6 +134,7 @@ async def background_sdr_worker():
                                     name=c_data["name"],
                                     title=c_data["title"],
                                     email=c_data["email"],
+                                    phone=c_data.get("phone"),
                                     linkedin_url=c_data["linkedin_url"],
                                     verification_status=c_data["verification_status"]
                                 )
@@ -171,9 +188,15 @@ app = FastAPI(title="AI SDR & eQMS B2B Lead Generator System", lifespan=lifespan
 OUTPUTS_DIR = os.path.join(os.path.dirname(__file__), "outputs")
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-os.makedirs(STATIC_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# Mount Frontend (Vite Build)
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+# Mount the root directory itself to catch things like favicon.svg if needed
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+@app.get("/")
+def index():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 # Schemas
 class StartCampaignRequest(BaseModel):
@@ -247,6 +270,7 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
                 "name": contact.name,
                 "title": contact.title,
                 "email": contact.email,
+                "phone": contact.phone,
                 "linkedin_url": contact.linkedin_url,
                 "web_search_url": web_search_url,
                 "verification_status": contact.verification_status,
@@ -272,6 +296,9 @@ def get_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
             "summary": lead.summary,
             "website_url": lead.website_url,
             "source": lead.source,
+            "source_directory": lead.source_directory,
+            "estimated_revenue": lead.estimated_revenue,
+            "is_sme": lead.is_sme,
             "social_links": social_links_data,
             "contacts": contacts_data
         })
@@ -428,16 +455,29 @@ def get_all_stored_records(
                     "personalized_hook": s.personalized_hook
                 } for s in contact.sequences
             ]
+            company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', lead.name)
+            company_clean = re.sub(r'[^a-zA-Z0-9\s]', '', company_clean).strip()
+            company_kw = company_clean.split()[0] if company_clean else lead.name.split()[0]
+            city_token = lead.region.split(',')[0].strip() if lead.region else ""
+            role_kw = "Quality Assurance" if "quality" in contact.title.lower() else ("Regulatory Affairs" if "regulatory" in contact.title.lower() else contact.title.split()[0])
+            g_parts = [company_kw, role_kw]
+            if city_token:
+                g_parts.append(city_token)
+            g_parts.append("LinkedIn profile")
+            g_query = urllib.parse.quote_plus(" ".join(g_parts))
+            web_search_url = f"https://www.google.com/search?q={g_query}"
+
             contacts_data.append({
                 "id": contact.id,
                 "name": contact.name,
                 "title": contact.title,
                 "email": contact.email,
+                "phone": contact.phone,
                 "linkedin_url": contact.linkedin_url,
+                "web_search_url": web_search_url,
                 "verification_status": contact.verification_status,
                 "sequences": seqs_data
             })
-            
         social_links_data = {}
         if lead.social_links:
             try:

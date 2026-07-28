@@ -88,25 +88,28 @@ class PersonaContactEnricher:
     def __init__(self):
         self.linkedin_resolver = QuickLeadLinkedInResolver()
 
-    def enrich_contacts_for_lead(self, domain: str, company_name: str, crawl_emails: List[str] = None, location_address: str = "") -> List[Dict[str, Any]]:
-        """Identifies target QA/RA decision-maker personas and generates verified work contacts with QuickLead LinkedIn profiles and Web Search links."""
+    def enrich_contacts_for_lead(self, domain: str, company_name: str, crawl_emails: List[str] = None, crawl_phones: List[str] = None, location_address: str = "") -> List[Dict[str, Any]]:
+        """Determines best contacts for SDR Outreach."""
         contacts = []
         clean_domain = domain.lower().replace("https://", "").replace("http://", "").replace("www.", "").strip("/")
-        company_clean = company_name.replace("Facilities", "").replace("Plant", "").replace("API", "").strip()
+        company_clean = re.sub(r'(?i)\b(pvt|ltd|inc|llc|corp|corporation|facilities|plant|manufacturing|pharma|pharmaceuticals|medical)\b', '', company_name)
         
-        # 1. Use emails found on website if available
+        # 1. Use real crawled emails if available
         if crawl_emails:
-            for idx, email in enumerate(crawl_emails[:2]):
+            # Add phone to the first crawled contact if available
+            primary_phone = crawl_phones[0] if crawl_phones else None
+            for idx, email in enumerate(crawl_emails[:4]): # Support up to 4 real emails
                 name_part = email.split("@")[0]
                 if "." in name_part and len(name_part.split(".")) == 2:
                     readable_name = name_part.replace(".", " ").title()
+                    title = "Quality Assurance Lead" if idx == 0 else "Director of Regulatory Affairs"
                 elif "_" in name_part and len(name_part.split("_")) == 2:
                     readable_name = name_part.replace("_", " ").title()
+                    title = "Quality Assurance Lead" if idx == 0 else "Director of Regulatory Affairs"
                 else:
-                    readable_name = "Quality & Regulatory Contact"
+                    readable_name = name_part.title()
+                    title = "Company Contact"
                     
-                title = "Quality Assurance Lead" if idx == 0 else "Director of Regulatory Affairs"
-                
                 linkedin = self.linkedin_resolver.resolve_linkedin_profile(readable_name, company_clean, title)
                 web_search = self.linkedin_resolver.resolve_google_web_search(readable_name, company_clean, title, location_address)
                 
@@ -114,27 +117,12 @@ class PersonaContactEnricher:
                     "name": readable_name,
                     "title": title,
                     "email": email,
+                    "phone": primary_phone if idx == 0 else None,
                     "linkedin_url": linkedin,
                     "web_search_url": web_search,
                     "verification_status": "VERIFIED"
                 })
 
-        # 2. Target decision-maker personas using truthful role titles (no fake synthetic names)
-        needed = 2 - len(contacts)
-        for i in range(needed):
-            persona = TARGET_PERSONAS[i % len(TARGET_PERSONAS)]
-            email = f"{persona['email_prefix']}@{clean_domain}"
-            
-            linkedin = self.linkedin_resolver.resolve_linkedin_profile(persona["name"], company_clean, persona["title"])
-            web_search = self.linkedin_resolver.resolve_google_web_search(persona["name"], company_clean, persona["title"], location_address)
-            
-            contacts.append({
-                "name": persona["name"],
-                "title": persona["title"],
-                "email": email,
-                "linkedin_url": linkedin,
-                "web_search_url": web_search,
-                "verification_status": "ROLE TARGET"
-            })
-
+        # Do not generate fake/synthetic contacts if no real emails were found.
+        # This forces the UI to display the empty state.
         return contacts

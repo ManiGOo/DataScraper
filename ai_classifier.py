@@ -54,7 +54,8 @@ Return JSON ONLY in this format:
 {{
   "qms_fit_score": 92,
   "compliance_drivers": ["FDA 21 CFR Part 11", "ISO 13485", "API Batch Audit Trail"],
-  "summary": "Short 2-sentence executive summary of why this Life Science / API producer requires eQMS software."
+  "summary": "Short 2-sentence executive summary of why this Life Science / API producer requires eQMS software.",
+  "exact_location": "Exact physical address or city/state if found in the text, otherwise null"
 }}
 """
 
@@ -80,7 +81,8 @@ Return JSON ONLY in this format:
                     return {
                         "qms_fit_score": parsed.get("qms_fit_score", 85),
                         "compliance_drivers": parsed.get("compliance_drivers", ["FDA 21 CFR Part 11", "ISO 13485"]),
-                        "summary": parsed.get("summary", "High-value Life Science / API producer requiring eQMS audit readiness.")
+                        "summary": parsed.get("summary", "High-value Life Science / API producer requiring eQMS audit readiness."),
+                        "exact_location": parsed.get("exact_location", None)
                     }
         except Exception as e:
             print(f"[AI Qualification] API Notice ({e}). Using fallback scorer.")
