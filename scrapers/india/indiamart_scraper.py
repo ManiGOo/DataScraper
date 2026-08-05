@@ -101,19 +101,20 @@ class IndiaMartScraper:
                 
                 while len(candidates) < target_raw and offset < 200: # Limit to 20 pages max to avoid infinite loops
                     print(f"[IndiaMart Scraper] Fetching search page offset {offset}...")
-                    url = f'https://www.bing.com/search?q={urllib.parse.quote(query)}&first={offset}'
+                    url = f'https://search.yahoo.com/search?p={urllib.parse.quote(query)}&b={offset}'
                     r = await client.get(url, headers=headers, timeout=10.0)
                     soup = BeautifulSoup(r.text, 'html.parser')
                     
-                    results = soup.find_all('li', class_='b_algo')
+                    results = soup.find_all('div', class_='compTitle')
                     if not results:
                         break
                         
-                    for li in results:
-                        h2 = li.find('h2')
-                        if not h2:
+                    for div in results:
+                        a_tag = div.find('a')
+                        if not a_tag:
                             continue
-                        text = h2.text.strip()
+                        h3 = a_tag.find('h3')
+                        text = h3.text.strip() if h3 else a_tag.text.strip()
                         
                         # Clean up IndiaMART title suffixes
                         company_name = text.split(' - ')[0].split(' | ')[0].strip()

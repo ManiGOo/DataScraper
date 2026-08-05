@@ -168,9 +168,16 @@ async def background_sdr_worker():
                         db.commit()
                     except Exception as e:
                         print(f"Campaign execution error: {e}")
-                        campaign.status = "FAILED"
-                        campaign.error_message = str(e)
-                        db.commit()
+                        db.rollback()
+                        try:
+                            campaign = db.query(SdrCampaign).filter(SdrCampaign.id == campaign_id).first()
+                            if campaign:
+                                campaign.status = "FAILED"
+                                campaign.error_message = str(e)
+                                db.commit()
+                        except Exception as e_inner:
+                            print(f"Failed to update campaign failure state: {e_inner}")
+                            db.rollback()
         except Exception as e:
             print(f"Background SDR worker loop notice: {e}")
             
